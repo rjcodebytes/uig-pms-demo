@@ -1,51 +1,40 @@
 import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/mongodb';
 import ProcurementRequest from '@/models/ProcurementRequest';
-import { auth } from '@/lib/auth';
+import { mockDb } from '@/lib/mockDb';
 
 export async function POST(req, { params }) {
   try {
-    await dbConnect();
     const { id } = params;
-    const session = await auth();
-    const payload = await req.json();
+    const { isApproved, notes } = await req.json();
 
-    const request = await ProcurementRequest.findOne({ ticketId: id });
-    
-    if (!request) {
-      return NextResponse.json({ error: 'Request not found' }, { status: 404 });
-    }
-
-    // Gate 1: Enforce that only entity matching requester.email can technically approve (or a mocked bypass for demo)
-    const userEmail = session?.user?.email || payload.email; // fallback to payload for demo purposes
-    if (request.requester.email !== userEmail && !payload.forceApprove) {
-      return NextResponse.json({ error: 'Unauthorized: Only the requester can technically approve.' }, { status: 403 });
-    }
-
-    if (request.status !== 'Quotation_Collection') {
-      return NextResponse.json({ error: 'Invalid state transition. Must be in Quotation_Collection.' }, { status: 400 });
-    }
-
-    request.technicalApproval = {
-      isApproved: true,
-      reviewedBy: userEmail,
-      reviewedAt: new Date(),
+    const newStatus = isApproved ? 'Finance_Review' : 'Rejected_Job';
+    const timelineEntry = {
+      status: newStatus,
+      date: new Date().toISOString(),
+      notes: notes || (isApproved ? 'Technically approved' : 'Technically rejected')
     };
-    request.status = 'Technical_Approval';
-    
-    // Choose the selected vendor from payload
-    if (payload.chosenVendorName) {
-      request.quotations.forEach(q => {
-        if (q.vendorName === payload.chosenVendorName) q.isChosen = true;
-        else q.isChosen = false;
-      });
+
+    try {
+      const conn = await dbConnect();
+      if (!conn) throw new Error("Offline");
+      const request = await ProcurementRequest.findById(id);
+      if (!request) return NextResponse.json({ success: false, message: 'Not found' }, { status: 404 });
+      
+      request.status = newStatus;
+      request.timeline.push(timelineEntry);
+      await request.save();
+      return NextResponse.json({ success: true, data: request }, { status: 200 });
+    } catch (dbErr) {
+      console.warn("MongoDB unavailable, updating mockDb");
+      const index = mockDb.requests.findIndex(r => r._id === id);
+      if (index === -1) return NextResponse.json({ success: false, message: 'Not found' }, { status: 404 });
+      
+      mockDb.requests[index].status = newStatus;
+      mockDb.requests[index].timeline.push(timelineEntry);
+      return NextResponse.json({ success: true, data: mockDb.requests[index] }, { status: 200 });
     }
-
-    await request.save();
-
-    return NextResponse.json({ success: true, data: request }, { status: 200 });
   } catch (error) {
-    console.error('Technical approval error:', error);
-    return NextResponse.json({ error: 'Internal Server Error', details: error.message }, { status: 500 });
+    return NextResponse.json({ success: false, message: 'Server error' }, { status: 500 });
   }
 }

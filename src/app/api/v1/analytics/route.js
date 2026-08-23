@@ -4,7 +4,6 @@ import ProcurementRequest from '@/models/ProcurementRequest';
 
 export async function GET(req) {
   try {
-    await dbConnect();
     const url = new URL(req.url);
     const type = url.searchParams.get('type') || 'all';
 

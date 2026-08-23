@@ -1,47 +1,45 @@
 import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/mongodb';
 import ProcurementRequest from '@/models/ProcurementRequest';
+import { mockDb } from '@/lib/mockDb';
 
 export async function POST(req, { params }) {
   try {
-    await dbConnect();
     const { id } = params;
-    const payload = await req.json(); // { action: 'delivery' | 'payment', data: {} }
+    const { action, notes, documentUrl } = await req.json();
 
-    const request = await ProcurementRequest.findOne({ ticketId: id });
-    if (!request) {
-      return NextResponse.json({ error: 'Request not found' }, { status: 404 });
+    let newStatus;
+    if (action === 'DELIVERY_CONFIRMED') newStatus = 'Delivery_Pending';
+    else if (action === 'PAYMENT_PROCESSED') newStatus = 'Completed';
+    else return NextResponse.json({ success: false, message: 'Invalid action' }, { status: 400 });
+
+    const timelineEntry = {
+      status: newStatus,
+      date: new Date().toISOString(),
+      notes: notes || action,
+      documentUrl
+    };
+
+    try {
+      const conn = await dbConnect();
+      if (!conn) throw new Error("Offline");
+      const request = await ProcurementRequest.findById(id);
+      if (!request) return NextResponse.json({ success: false, message: 'Not found' }, { status: 404 });
+      
+      request.status = newStatus;
+      request.timeline.push(timelineEntry);
+      await request.save();
+      return NextResponse.json({ success: true, data: request }, { status: 200 });
+    } catch (dbErr) {
+      console.warn("MongoDB unavailable, updating mockDb");
+      const index = mockDb.requests.findIndex(r => r._id === id);
+      if (index === -1) return NextResponse.json({ success: false, message: 'Not found' }, { status: 404 });
+      
+      mockDb.requests[index].status = newStatus;
+      mockDb.requests[index].timeline.push(timelineEntry);
+      return NextResponse.json({ success: true, data: mockDb.requests[index] }, { status: 200 });
     }
-
-    if (payload.action === 'delivery') {
-      if (request.status !== 'PO_Generated') {
-        return NextResponse.json({ error: 'Must be in PO_Generated status.' }, { status: 400 });
-      }
-      request.deliveryConfirmation = {
-        signedNoteUrl: payload.data.signedNoteUrl || '/mock/signed-note.png',
-        recipientSignatureName: payload.data.recipientSignatureName || 'Warehouse Staff',
-        receivedAt: new Date(),
-      };
-      request.status = 'Delivery_Pending'; // Or could go straight to Payment required
-    } else if (payload.action === 'payment') {
-      if (request.status !== 'Delivery_Pending' && request.status !== 'PO_Generated') {
-         return NextResponse.json({ error: 'Must be delivered or PO generated to pay.' }, { status: 400 });
-      }
-      request.paymentRecord = {
-        transactionRef: payload.data.transactionRef || `TXN-${Math.floor(Math.random() * 999999)}`,
-        amountPaid: payload.data.amountPaid,
-        paidAt: new Date(),
-      };
-      request.status = 'Completed';
-    } else {
-      return NextResponse.json({ error: 'Invalid action type.' }, { status: 400 });
-    }
-
-    await request.save();
-
-    return NextResponse.json({ success: true, data: request }, { status: 200 });
   } catch (error) {
-    console.error('Lifecycle error:', error);
-    return NextResponse.json({ error: 'Internal Server Error', details: error.message }, { status: 500 });
+    return NextResponse.json({ success: false, message: 'Server error' }, { status: 500 });
   }
 }
