@@ -57,9 +57,9 @@ export default function ProcurementDashboard() {
             <Link href="/procurement/analytics" className="inline-flex items-center px-4 py-2 border border-white/10 shadow-sm text-sm font-medium rounded-lg text-zinc-300 bg-zinc-900/50 hover:bg-zinc-800 hover:text-white transition backdrop-blur-md">
               View Analytics
             </Link>
-            <button className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-lg text-white bg-indigo-600 hover:bg-indigo-500 transition glow-border">
+            <Link href="/procurement/request/new" className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-lg text-white bg-indigo-600 hover:bg-indigo-500 transition glow-border">
               <Plus className="w-4 h-4 mr-2" /> New Request
-            </button>
+            </Link>
           </div>
         </div>
 
@@ -84,40 +84,42 @@ export default function ProcurementDashboard() {
         ) : (
           <div className="space-y-4">
             {requests.map(req => (
-              <div key={req._id} className="glass-card rounded-xl p-5 flex items-center justify-between group cursor-pointer">
-                
-                <div className="flex items-center flex-1 min-w-0">
-                  <div className="flex-shrink-0 bg-indigo-500/10 p-3 rounded-xl border border-indigo-500/20 group-hover:bg-indigo-500/20 transition">
-                    <FileText className="w-6 h-6 text-indigo-400" />
+              <Link href={`/procurement/request/${req._id}`} key={req._id} className="block">
+                <div className="glass-card rounded-xl p-5 flex items-center justify-between group cursor-pointer hover:bg-zinc-900/80 transition-all">
+                  
+                  <div className="flex items-center flex-1 min-w-0">
+                    <div className="flex-shrink-0 bg-indigo-500/10 p-3 rounded-xl border border-indigo-500/20 group-hover:bg-indigo-500/30 transition">
+                      <FileText className="w-6 h-6 text-indigo-400" />
+                    </div>
+                    <div className="min-w-0 flex-1 px-5 md:grid md:grid-cols-3 md:gap-4">
+                      <div>
+                        <p className="text-sm font-bold text-white truncate">{req.ticketId}</p>
+                        <p className="mt-1 flex items-center text-sm text-zinc-400">
+                          <span className="truncate">{req.itemDetails.name} <span className="text-zinc-500 ml-1">x{req.itemDetails.quantity}</span></span>
+                        </p>
+                      </div>
+                      <div className="hidden md:block">
+                        <p className="text-sm text-zinc-300 truncate">{req.project.projectName}</p>
+                        <p className="mt-1 flex items-center text-sm text-zinc-500">
+                          <MapPin className="w-3.5 h-3.5 mr-1 text-zinc-600" /> {req.location}
+                        </p>
+                      </div>
+                      <div className="hidden md:flex items-center">
+                        <span className={`px-3 py-1 inline-flex text-xs font-semibold rounded-full border ${getStatusBadge(req.status)}`}>
+                          {req.status.replace('_', ' ')}
+                        </span>
+                      </div>
+                    </div>
                   </div>
-                  <div className="min-w-0 flex-1 px-5 md:grid md:grid-cols-3 md:gap-4">
-                    <div>
-                      <p className="text-sm font-bold text-white truncate">{req.ticketId}</p>
-                      <p className="mt-1 flex items-center text-sm text-zinc-400">
-                        <span className="truncate">{req.itemDetails.name} <span className="text-zinc-500 ml-1">x{req.itemDetails.quantity}</span></span>
-                      </p>
-                    </div>
-                    <div className="hidden md:block">
-                      <p className="text-sm text-zinc-300 truncate">{req.project.projectName}</p>
-                      <p className="mt-1 flex items-center text-sm text-zinc-500">
-                        <MapPin className="w-3.5 h-3.5 mr-1 text-zinc-600" /> {req.location}
-                      </p>
-                    </div>
-                    <div className="hidden md:flex items-center">
-                      <span className={`px-3 py-1 inline-flex text-xs font-semibold rounded-full border ${getStatusBadge(req.status)}`}>
-                        {req.status.replace('_', ' ')}
-                      </span>
-                    </div>
+                  
+                  <div>
+                    <button className="text-zinc-500 hover:text-indigo-400 p-2 transition">
+                      <ChevronRight className="w-5 h-5 group-hover:translate-x-1 group-hover:text-indigo-400 transition-all" />
+                    </button>
                   </div>
-                </div>
-                
-                <div>
-                  <button className="text-zinc-500 hover:text-indigo-400 p-2 transition">
-                    <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                  </button>
-                </div>
 
-              </div>
+                </div>
+              </Link>
             ))}
             {requests.length === 0 && (
               <div className="p-12 text-center text-zinc-500 glass-card rounded-xl">No procurement requests found in your region.</div>
