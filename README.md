@@ -1,87 +1,36 @@
-# Purchase Management System - Laravel
+This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
-This project is a Purchase Management System (PMS) built using PHP and Laravel. It is designed to simulate the procurement approval process in a college.
+## Getting Started
 
-## Prerequisites
-
-Before you start, ensure you have the following software installed on your machine:
-
-- XAMPP Server (Apache, MySQL)
-- Laravel
-- Composer
-- VS Code or any other preferred code editor
-- Browser (e.g Chrome, Edge)
-
-## Setup Instructions
-
-Follow these steps to set up and run the project locally:
-
-### 1. Clone the repository
-
-First, clone the repository to your local machine using Git:
+First, run the development server:
 
 ```bash
-git clone https://github.com/shaileshcheke/gcoej_purchase_management_laravel.git
+npm run dev
+# or
+yarn dev
+# or
+pnpm dev
+# or
+bun dev
 ```
 
-### 2. Install Dependencies
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-Navigate to the project folder and install the required dependencies via Composer:
+You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
-```bash
-cd gcoej_purchase_management_laravel
-composer install
-```
+This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
-### 3. Configure environment settings
+## Learn More
 
-Open the project in your code editor (e.g., VS Code) and rename .env.example to .env:
+To learn more about Next.js, take a look at the following resources:
 
-```bash
-mv .env.example .env
-```
+- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
+- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
 
-### 4. Set up the database
+You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
 
-Create a database for the project. You can copy the database details from the .env file (e.g., database name, username, password).
+## Deploy on Vercel
 
-### 5. Run database migrations
+The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
-In the terminal, run the following command to migrate the database tables:
-
-```bash
-php artisan migrate
-```
-
-### 6. Generate application key
-
-Generate a new application key using the following command:
-
-```bash
-php artisan key:generate
-```
-
-### 7. Create symbolic link for storage
-
-Create a symbolic link to store files and assets:
-
-```bash
-php artisan storage:link
-```
-
-### 8. Run the project
-
-Finally, run the project locally by starting the Laravel development server:
-
-```bash
-php artisan serve
-```
-
-### 9. Access the Project
-
-Verify the deployment by navigating to your server address in your preferred browser.
-
-```sh
-http://127.0.0.1:8000
-```
-The project is now ready to use!
+Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
