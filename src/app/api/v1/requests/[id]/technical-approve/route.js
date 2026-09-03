@@ -1,11 +1,22 @@
 import { NextResponse } from 'next/server';
 import mongoose from 'mongoose';
+import { auth } from '@/lib/auth';
 import dbConnect from '@/lib/mongodb';
 import ProcurementRequest from '@/models/ProcurementRequest';
 import { mockDb } from '@/lib/mockDb';
 
 export async function POST(req, context) {
   try {
+    const session = await auth();
+    if (!session?.user) {
+      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 });
+    }
+
+    const allowedRoles = ['Approver', 'Technical Approver', 'Admin'];
+    if (!allowedRoles.includes(session.user.role)) {
+      return NextResponse.json({ success: false, message: 'Forbidden: Insufficient privileges for technical approval' }, { status: 403 });
+    }
+
     const params = await context?.params;
     const id = params?.id;
     const { isApproved, notes } = await req.json();
@@ -17,7 +28,8 @@ export async function POST(req, context) {
       date: new Date().toISOString(),
       timestamp: new Date().toISOString(),
       notes: notes || (isApproved ? 'Technically approved specifications' : 'Technically rejected specifications'),
-      actor: 'Technical Approver / HOD',
+      actor: session.user.name || session.user.username || 'Technical Approver',
+      role: session.user.role || 'Approver',
     };
 
     try {
@@ -25,6 +37,22 @@ export async function POST(req, context) {
       const findQuery = mongoose.isValidObjectId(id) ? { $or: [{ _id: id }, { ticketId: id }] } : { ticketId: id };
       const request = await ProcurementRequest.findOne(findQuery);
       if (!request) return NextResponse.json({ success: false, message: 'Not found' }, { status: 404 });
+
+      // Validate predecessor state
+      const allowedPredecessors = ['Incoming', 'Quotation_Collection', 'Technical_Approval'];
+      if (!allowedPredecessors.includes(request.status)) {
+        return NextResponse.json({
+          success: false,
+          message: `Invalid state transition: Cannot technically approve from '${request.status}'`,
+        }, { status: 400 });
+      }
+
+      if (!request.quotations || request.quotations.length === 0) {
+        return NextResponse.json({
+          success: false,
+          message: 'Cannot perform technical approval: Quotations must be submitted first',
+        }, { status: 400 });
+      }
       
       request.status = newStatus;
       if (!request.timeline) request.timeline = [];
@@ -36,6 +64,22 @@ export async function POST(req, context) {
       const index = mockDb.requests.findIndex(r => r._id === id || r.ticketId === id);
       if (index === -1) return NextResponse.json({ success: false, message: 'Not found' }, { status: 404 });
       
+      const reqDoc = mockDb.requests[index];
+      const allowedPredecessors = ['Incoming', 'Quotation_Collection', 'Technical_Approval'];
+      if (!allowedPredecessors.includes(reqDoc.status)) {
+        return NextResponse.json({
+          success: false,
+          message: `Invalid state transition: Cannot technically approve from '${reqDoc.status}'`,
+        }, { status: 400 });
+      }
+
+      if (!reqDoc.quotations || reqDoc.quotations.length === 0) {
+        return NextResponse.json({
+          success: false,
+          message: 'Cannot perform technical approval: Quotations must be submitted first',
+        }, { status: 400 });
+      }
+
       mockDb.requests[index].status = newStatus;
       mockDb.requests[index].timeline.push(timelineEntry);
       return NextResponse.json({ success: true, data: mockDb.requests[index] }, { status: 200 });

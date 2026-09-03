@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { getAssignedProcurementDesk } from '@/lib/assignProcurementDesk';
 
 const ProcurementRequestSchema = new mongoose.Schema(
   {
@@ -129,6 +130,13 @@ const ProcurementRequestSchema = new mongoose.Schema(
       inspectionNotes: { type: String, default: 'All physical goods inspected with zero defect or transit damage.' },
       fullDeliveryReceived: { type: Boolean, default: true },
     },
+    invoice: {
+      vendorInvoiceNumber: { type: String },
+      invoiceAmount: { type: Number },
+      invoiceDocUrl: { type: String, default: '/docs/invoice-sample.pdf' },
+      receivedAt: { type: Date },
+      recordedBy: { type: String },
+    },
     paymentRecord: {
       transactionRef: { type: String },
       amountPaid: { type: Number },
@@ -136,6 +144,7 @@ const ProcurementRequestSchema = new mongoose.Schema(
       paidAt: { type: Date },
       bankReference: { type: String },
       accountsAuditor: { type: String, default: 'Finance Accounts Desk' },
+      threeWayMatchStatus: { type: String, default: 'Pending' },
     },
     flaggedIssue: {
       isFlagged: { type: Boolean, default: false },
@@ -172,37 +181,7 @@ ProcurementRequestSchema.pre('save', async function () {
     }
 
     if (!this.assignedTo || !this.assignedTo.name) {
-      this.assignedTo = this.assignedTo || {};
-      switch (this.location) {
-        case 'Riyadh':
-          this.assignedTo = {
-            name: 'Riyadh Central Procurement Desk',
-            desk: 'Central Hub Desk',
-            officer: 'Tariq Al-Mansoor',
-          };
-          break;
-        case 'Jeddah':
-          this.assignedTo = {
-            name: 'Western Province Procurement Desk',
-            desk: 'Western Desk',
-            officer: 'Fahad Al-Harbi',
-          };
-          break;
-        case 'Dammam':
-        case 'Khobar':
-          this.assignedTo = {
-            name: 'Eastern Province Procurement Desk',
-            desk: 'Eastern Desk',
-            officer: 'Sultan Al-Otaibi',
-          };
-          break;
-        default:
-          this.assignedTo = {
-            name: 'National Procurement Desk',
-            desk: 'General Desk',
-            officer: 'Operations Desk',
-          };
-      }
+      this.assignedTo = getAssignedProcurementDesk(this.location);
     }
   }
 });

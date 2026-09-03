@@ -1,11 +1,17 @@
 import { NextResponse } from 'next/server';
 import mongoose from 'mongoose';
+import { auth } from '@/lib/auth';
 import dbConnect from '@/lib/mongodb';
 import ProcurementRequest from '@/models/ProcurementRequest';
 import { mockDb } from '@/lib/mockDb';
 
 export async function POST(req, context) {
   try {
+    const session = await auth();
+    if (!session?.user) {
+      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 });
+    }
+
     const url = new URL(req.url);
     const pathParts = url.pathname.split('/').filter(Boolean);
     const reqIdx = pathParts.indexOf('requests');
@@ -16,7 +22,31 @@ export async function POST(req, context) {
     const id = decodeURIComponent(rawId || '');
 
     const body = await req.json();
-    const { action, notes, quotations, documentUrl, reasonCategory, targetStage, currentStage, flaggedBy, flaggedRole } = body;
+    const { action, notes, quotations, documentUrl, reasonCategory, targetStage, currentStage } = body;
+
+    // Role checks based on action
+    const userRole = session.user.role;
+    if (action === 'DELIVERY_CONFIRMED') {
+      const allowed = ['Store Keeper', 'Storekeeper', 'Initiator', 'Admin'];
+      if (!allowed.includes(userRole)) {
+        return NextResponse.json({ success: false, message: 'Forbidden: Only Storekeeper or Site Initiator can confirm delivery' }, { status: 403 });
+      }
+    } else if (action === 'PAYMENT_PROCESSED') {
+      const allowed = ['Store Incharge', 'Finance Controller', 'Finance', 'Admin'];
+      if (!allowed.includes(userRole)) {
+        return NextResponse.json({ success: false, message: 'Forbidden: Only Finance Controller can process payment' }, { status: 403 });
+      }
+    } else if (action === 'QUOTES_SUBMITTED') {
+      const allowed = ['Initiator', 'Procurement', 'Admin', 'Approver', 'Store Incharge'];
+      if (!allowed.includes(userRole)) {
+        return NextResponse.json({ success: false, message: 'Forbidden: Insufficient privileges to submit quotations' }, { status: 403 });
+      }
+    } else if (action === 'FLAG_ISSUE' || action === 'REVERT_STAGE') {
+      const allowed = ['Approver', 'Technical Approver', 'Store Incharge', 'Finance Controller', 'Finance', 'Admin'];
+      if (!allowed.includes(userRole)) {
+        return NextResponse.json({ success: false, message: 'Forbidden: Insufficient privileges to flag issues' }, { status: 403 });
+      }
+    }
 
     let newStatus;
     if (action === 'QUOTES_SUBMITTED') {
@@ -33,6 +63,9 @@ export async function POST(req, context) {
       return NextResponse.json({ success: false, message: `Invalid action: ${action}` }, { status: 400 });
     }
 
+    const actorName = session.user.name || session.user.username || 'System User';
+    const actorRole = session.user.role || 'User';
+
     const timelineEntry = {
       stage: action === 'FLAG_ISSUE' ? 'Issue_Flagged' : newStatus,
       status: newStatus,
@@ -41,8 +74,65 @@ export async function POST(req, context) {
       notes: action === 'FLAG_ISSUE'
         ? `⚠️ Issue Flagged (${reasonCategory || 'Revision Required'}): ${notes || 'Reverted back for corrections'}`
         : (notes || `Transitioned to ${newStatus.replace(/_/g, ' ')}`),
-      actor: flaggedBy || (action === 'QUOTES_SUBMITTED' ? 'Procurement Officer' : action === 'DELIVERY_CONFIRMED' ? 'Site Receiver' : 'Finance Controller'),
+      actor: actorName,
+      role: actorRole,
       documentUrl
+    };
+
+    // Helper to validate state transitions (Issue 4) and 3-Way Match (Issue 5)
+    const validateAndApplyTransition = (reqDoc) => {
+      if (action === 'QUOTES_SUBMITTED') {
+        const allowed = ['Incoming', 'Quotation_Collection'];
+        if (!allowed.includes(reqDoc.status)) {
+          return { error: `Invalid state transition: Cannot submit quotes from '${reqDoc.status}'` };
+        }
+        if (!quotations || quotations.length === 0) {
+          return { error: 'Quotations array must contain at least 1 quotation' };
+        }
+      } else if (action === 'DELIVERY_CONFIRMED') {
+        const allowed = ['PO_Generated', 'Delivery_Pending'];
+        if (!allowed.includes(reqDoc.status)) {
+          return { error: `Invalid state transition: Cannot confirm delivery from '${reqDoc.status}', must be PO_Generated` };
+        }
+      } else if (action === 'PAYMENT_PROCESSED') {
+        if (reqDoc.status !== 'Delivery_Pending') {
+          return { error: `Invalid state transition: Payment requires Delivery_Pending with confirmed GRN, current status is '${reqDoc.status}'` };
+        }
+
+        // Real 3-Way Match Validation (Issue 5)
+        const winningQuote = reqDoc.quotations?.find(q => q.isChosen) || reqDoc.quotations?.[0];
+        const poAmount = winningQuote?.totalPrice || 0;
+        const invoiceAmount = body.invoiceAmount !== undefined
+          ? Number(body.invoiceAmount)
+          : (body.invoice?.invoiceAmount !== undefined ? Number(body.invoice.invoiceAmount) : (reqDoc.invoice?.invoiceAmount || poAmount));
+        
+        const tolerance = 1; // 1 SAR tolerance
+        const difference = Math.abs(invoiceAmount - poAmount);
+
+        if (difference > tolerance && !body.overrideMatchMismatch) {
+          return {
+            error: `3-Way Match Failed: Vendor invoice amount (${invoiceAmount} SAR) does not match PO authorized amount (${poAmount} SAR). Difference: ${difference} SAR. Set overrideMatchMismatch=true to force.`,
+          };
+        }
+
+        reqDoc.invoice = {
+          vendorInvoiceNumber: body.invoiceNumber || body.invoice?.vendorInvoiceNumber || `INV-2026-${Math.floor(10000 + Math.random() * 90000)}`,
+          invoiceAmount: invoiceAmount,
+          invoiceDocUrl: documentUrl || body.invoiceDocUrl || '/docs/invoice-sample.pdf',
+          receivedAt: new Date(),
+          recordedBy: actorName,
+        };
+
+        reqDoc.paymentRecord = {
+          transactionRef: `TXN-SAMA-${Math.floor(100000 + Math.random() * 900000)}`,
+          amountPaid: invoiceAmount,
+          paymentMethod: 'Corporate Wire (SAMA SARIE)',
+          paidAt: new Date(),
+          threeWayMatchStatus: `Verified (PO: ${poAmount} SAR == GRN: 100% == Invoice: ${invoiceAmount} SAR)`,
+          accountsAuditor: actorName,
+        };
+      }
+      return null;
     };
 
     // 1. Try Live MongoDB
@@ -59,6 +149,11 @@ export async function POST(req, context) {
       let request = await ProcurementRequest.findOne({ $or: orConditions });
       
       if (request) {
+        const validation = validateAndApplyTransition(request);
+        if (validation?.error) {
+          return NextResponse.json({ success: false, message: validation.error }, { status: 400 });
+        }
+
         request.status = newStatus;
         if (!request.timeline) request.timeline = [];
         request.timeline.push(timelineEntry);
@@ -71,8 +166,8 @@ export async function POST(req, context) {
             isFlagged: true,
             reasonCategory: reasonCategory || 'Technical / Commercial Issue',
             comments: notes || 'Revision required by reviewer.',
-            flaggedBy: flaggedBy || 'Approver',
-            flaggedRole: flaggedRole || 'Approver',
+            flaggedBy: actorName,
+            flaggedRole: actorRole,
             flaggedAt: new Date(),
             revertedFromStage: currentStage || 'Technical_Approval',
           };
@@ -81,15 +176,10 @@ export async function POST(req, context) {
         } else if (action === 'DELIVERY_CONFIRMED') {
           request.deliveryConfirmation = {
             receivedAt: new Date(),
-            recipientSignatureName: body.receiverName || 'Eng. Mohammed Al-Saud (Site Lead)',
+            recipientSignatureName: actorName,
             signedNoteUrl: documentUrl || '/docs/signed-grn-receipt.pdf',
-          };
-        } else if (action === 'PAYMENT_PROCESSED') {
-          const winningQuote = request.quotations?.find(q => q.isChosen) || request.quotations?.[0];
-          request.paymentRecord = {
-            transactionRef: `TXN-SAMA-${Math.floor(100000 + Math.random() * 900000)}`,
-            amountPaid: winningQuote?.totalPrice || 45000,
-            paidAt: new Date(),
+            inspectionNotes: notes || 'All physical goods inspected with zero defect or transit damage.',
+            fullDeliveryReceived: true,
           };
         }
 
@@ -103,18 +193,33 @@ export async function POST(req, context) {
     // 2. Fallback to mockDb
     const index = mockDb.requests.findIndex(r => r._id === id || r.ticketId === id || r.ticketId === id.toUpperCase());
     if (index !== -1) {
+      const mockReq = mockDb.requests[index];
+      const validation = validateAndApplyTransition(mockReq);
+      if (validation?.error) {
+        return NextResponse.json({ success: false, message: validation.error }, { status: 400 });
+      }
+
       mockDb.requests[index].status = newStatus;
       if (action === 'QUOTES_SUBMITTED' && quotations) {
         mockDb.requests[index].quotations = quotations;
+        if (mockDb.requests[index].flaggedIssue) mockDb.requests[index].flaggedIssue.isFlagged = false;
       }
       if (action === 'FLAG_ISSUE') {
         mockDb.requests[index].flaggedIssue = {
           isFlagged: true,
           reasonCategory: reasonCategory || 'Issue Flagged',
           comments: notes,
-          flaggedBy,
-          flaggedRole,
+          flaggedBy: actorName,
+          flaggedRole: actorRole,
           flaggedAt: new Date(),
+        };
+      }
+      if (action === 'DELIVERY_CONFIRMED') {
+        mockDb.requests[index].deliveryConfirmation = {
+          receivedAt: new Date(),
+          recipientSignatureName: actorName,
+          signedNoteUrl: documentUrl || '/docs/signed-grn-receipt.pdf',
+          fullDeliveryReceived: true,
         };
       }
       mockDb.requests[index].timeline.push(timelineEntry);

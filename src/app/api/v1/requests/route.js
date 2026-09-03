@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/mongodb';
 import ProcurementRequest from '@/models/ProcurementRequest';
 import { mockDb } from '@/lib/mockDb';
+import { validateProcurementRequestBody } from '@/lib/validateRequest';
+import { getAssignedProcurementDesk } from '@/lib/assignProcurementDesk';
 
 export async function GET(req) {
   try {
@@ -35,12 +37,14 @@ export async function POST(req) {
   try {
     const body = await req.json();
     
-    let location = body.location || 'Riyadh';
-    if (!body.location && body.project?.projectName?.toLowerCase().includes('jeddah')) {
-      location = 'Jeddah';
-    } else if (!body.location && body.project?.projectName?.toLowerCase().includes('dammam')) {
-      location = 'Dammam';
+    // Explicit validation matching Mongoose schema
+    const validationError = validateProcurementRequestBody(body);
+    if (validationError) {
+      return NextResponse.json({ success: false, message: validationError }, { status: 400 });
     }
+
+    const location = body.location;
+    const assignedTo = getAssignedProcurementDesk(location);
 
     const newRequest = {
       ticketId: `PR-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`,
@@ -53,22 +57,30 @@ export async function POST(req) {
           { name: 'technical-specs-sheet.pdf', url: '/docs/spec-sheet.pdf' }
         ],
       },
-      requester: typeof body.requester === 'object' ? body.requester : {
-        name: body.requester || 'Eng. Mohammed Al-Saud (Site Lead)',
-        email: 'm.alsaud@uig.com',
-        department: body.department || 'Site Operations & Civil',
-        mobile: '+966 50 112 3344',
+      requester: {
+        name: body.requester.name,
+        email: body.requester.email,
+        department: body.requester.department,
+        mobile: body.requester.mobile || '+966 50 112 3344',
       },
-      project: body.project || {
-        projectId: 'PRJ-RYD-METRO',
-        projectName: 'Riyadh Metro Extension Phase 2',
-        allocatedBudget: 350000,
-        client: 'Royal Commission for Riyadh City',
+      project: {
+        projectId: body.project.projectId,
+        projectName: body.project.projectName,
+        allocatedBudget: Number(body.project.allocatedBudget),
+        client: body.project.client || 'UIG Enterprise',
       },
       location,
-      itemDetails: body.itemDetails,
+      assignedTo,
+      itemDetails: {
+        name: body.itemDetails.name,
+        category: body.itemDetails.category,
+        description: body.itemDetails.description || '',
+        quantity: Number(body.itemDetails.quantity),
+        unit: body.itemDetails.unit || 'Units',
+        targetPrice: body.itemDetails.targetPrice !== undefined ? Number(body.itemDetails.targetPrice) : undefined,
+      },
       status: 'Incoming',
-      priority: body.priority || 'High',
+      priority: body.priority || 'Medium',
       timeline: [
         {
           stage: 'Incoming',
