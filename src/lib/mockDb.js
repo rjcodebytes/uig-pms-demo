@@ -1,44 +1,91 @@
 // src/lib/mockDb.js
 // Persistent in-memory store for Next.js development server
-// This simulates a live database for the local demo.
 
 if (!global._mockDb) {
   global._mockDb = {
-    requests: [
+    requests: [],
+    vendors: [
       {
-        _id: '1',
-        ticketId: 'REQ-2024-001',
-        requester: 'Mohammed Al-Saud',
-        department: 'Operations',
-        location: 'Riyadh',
-        project: { projectId: 'PRJ-RYD-01', projectName: 'Riyadh Metro Expansion' },
-        itemDetails: { name: 'Industrial Safety Helmets', category: 'Safety', quantity: 500 },
-        status: 'Quotation_Collection',
-        priority: 'High',
-        timeline: [{ status: 'Incoming', date: new Date().toISOString(), notes: 'Created via WhatsApp' }],
-        vendorQuotations: []
+        _id: 'v1',
+        vendorName: 'Jarir Marketing Co. (Commercial)',
+        category: 'IT Hardware & Electronics',
+        crNumber: '1010012214',
+        vatNumber: '300000584700003',
+        rating: 4.9,
+        status: 'Approved',
+        contactPerson: 'Ziyad Al-Qahtani',
+        email: 'corporate@jarir.com',
+        phone: '+966 11 462 6000',
+        city: 'Riyadh',
+        totalSpendSAR: 285000,
+        completedOrders: 14,
+        avgDeliveryDays: 3,
       },
       {
-        _id: '2',
-        ticketId: 'REQ-2024-002',
-        requester: 'Fatima Al-Hassan',
-        department: 'IT',
-        location: 'Jeddah',
-        project: { projectId: 'PRJ-JED-05', projectName: 'HQ Network Upgrade' },
-        itemDetails: { name: 'Cisco Core Switches', category: 'IT', quantity: 4 },
-        status: 'Technical_Approval',
-        priority: 'Critical',
-        timeline: [
-          { status: 'Incoming', date: new Date().toISOString() },
-          { status: 'Quotation_Collection', date: new Date().toISOString() }
-        ],
-        vendorQuotations: [
-          { vendorName: 'Al-Jazirah Tech', totalPrice: 45000, leadTimeDays: 14, specificationsText: 'Enterprise grade Cisco switches.', quotationDocUrl: '#', isChosen: false },
-          { vendorName: 'Saudi IT Solutions', totalPrice: 42000, leadTimeDays: 21, specificationsText: 'Refurbished Cisco switches.', quotationDocUrl: '#', isChosen: false },
-          { vendorName: 'Global Net KSA', totalPrice: 46000, leadTimeDays: 7, specificationsText: 'Latest gen Cisco switches.', quotationDocUrl: '#', isChosen: false }
-        ]
-      }
-    ]
+        _id: 'v2',
+        vendorName: 'Saudi ReadyMix Concrete Ltd',
+        category: 'Construction Materials',
+        crNumber: '2050019842',
+        vatNumber: '310123456700003',
+        rating: 4.8,
+        status: 'Approved',
+        contactPerson: 'Nasser Al-Subaie',
+        email: 'commercial@saudireadymix.com',
+        phone: '+966 13 882 1100',
+        city: 'Dammam',
+        totalSpendSAR: 420000,
+        completedOrders: 6,
+        avgDeliveryDays: 2,
+      },
+      {
+        _id: 'v3',
+        vendorName: 'Al-Jazirah Technology Solutions',
+        category: 'IT Hardware & Networking',
+        crNumber: '1010482910',
+        vatNumber: '300987654300003',
+        rating: 4.6,
+        status: 'Approved',
+        contactPerson: 'Hussam Al-Ghamdi',
+        email: 'enterprise@aljazirah-tech.sa',
+        phone: '+966 11 210 4455',
+        city: 'Riyadh',
+        totalSpendSAR: 195000,
+        completedOrders: 8,
+        avgDeliveryDays: 6,
+      },
+      {
+        _id: 'v4',
+        vendorName: 'IKEA Business Solutions KSA',
+        category: 'Office Furniture & Fixtures',
+        crNumber: '4030099411',
+        vatNumber: '300112233400003',
+        rating: 4.7,
+        status: 'Approved',
+        contactPerson: 'Layla Al-Amoudi',
+        email: 'business@ikea.com.sa',
+        phone: '+966 12 654 3210',
+        city: 'Jeddah',
+        totalSpendSAR: 145000,
+        completedOrders: 9,
+        avgDeliveryDays: 5,
+      },
+      {
+        _id: 'v5',
+        vendorName: 'Saudi Arabian Safety & PPE Corp',
+        category: 'Industrial & Safety Equipment',
+        crNumber: '1010334455',
+        vatNumber: '300554433200003',
+        rating: 4.9,
+        status: 'Approved',
+        contactPerson: 'Fahad Al-Husseini',
+        email: 'sales@saudisafety.sa',
+        phone: '+966 11 889 9000',
+        city: 'Riyadh',
+        totalSpendSAR: 95000,
+        completedOrders: 5,
+        avgDeliveryDays: 4,
+      },
+    ],
   };
 }
 

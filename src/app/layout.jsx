@@ -1,14 +1,22 @@
 import './globals.css';
+import { auth } from '@/lib/auth';
+import AuthProvider from '@/components/providers/AuthProvider';
 
 export const metadata = {
-  title: 'PMS – Purchase Management System',
-  description: 'Purchase Management System for GCoEJ',
+  title: 'UIG PMS – Enterprise Procurement & Lifecycle Management',
+  description: 'Saudi Corporate Enterprise Procurement & Lifecycle Platform',
 };
 
-export default function RootLayout({ children }) {
+export default async function RootLayout({ children }) {
+  const session = await auth();
+
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body className="bg-slate-50 text-slate-900 min-h-screen antialiased">
+        <AuthProvider session={session}>
+          {children}
+        </AuthProvider>
+      </body>
     </html>
   );
 }
