@@ -3,8 +3,10 @@ import Credentials from 'next-auth/providers/credentials';
 import bcrypt from 'bcryptjs';
 import dbConnect from '@/lib/mongodb';
 import User from '@/models/User';
+import { authConfig } from '@/auth.config';
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  ...authConfig,
   providers: [
     Credentials({
       name: 'credentials',
@@ -69,34 +71,5 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       },
     }),
   ],
-  callbacks: {
-    async jwt({ token, user }) {
-      if (user) {
-        token.id = user.id;
-        token.username = user.username;
-        token.role = user.role;
-        token.roleId = user.roleId;
-        token.position = user.position;
-        token.department = user.department;
-        token.mobile = user.mobile;
-        token.gender = user.gender;
-      }
-      return token;
-    },
-    async session({ session, token }) {
-      if (token) {
-        session.user.id = token.id;
-        session.user.username = token.username;
-        session.user.role = token.role;
-        session.user.roleId = token.roleId;
-        session.user.position = token.position;
-        session.user.department = token.department;
-        session.user.mobile = token.mobile;
-        session.user.gender = token.gender;
-      }
-      return session;
-    },
-  },
-  pages: { signIn: '/login' },
   session: { strategy: 'jwt' },
 });

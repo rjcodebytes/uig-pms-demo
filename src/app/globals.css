@@ -1,32 +1,46 @@
 @import "tailwindcss";
 
-@theme {
-  --color-slate-950: #020617;
-  --color-zinc-900: #18181b;
-  --color-zinc-950: #09090b;
-}
-
 @layer base {
   body {
-    @apply bg-zinc-950 text-gray-100 min-h-screen antialiased selection:bg-indigo-500/30;
+    @apply bg-slate-50 text-slate-900 min-h-screen antialiased selection:bg-blue-600 selection:text-white;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
 }
 
 @layer utilities {
-  .glass-panel {
-    @apply bg-white/5 backdrop-blur-xl border border-white/10 shadow-2xl;
-  }
-  
-  .glass-card {
-    @apply bg-zinc-900/50 backdrop-blur-md border border-white/5 hover:border-white/10 hover:bg-zinc-900/80 transition-all duration-300;
+  .corp-card {
+    @apply bg-white border border-slate-200 rounded-xl shadow-xs hover:shadow-md transition-all duration-200;
   }
 
-  .text-gradient {
-    @apply bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 via-purple-400 to-emerald-400;
+  .corp-card-elevated {
+    @apply bg-white border border-slate-200 rounded-2xl shadow-sm hover:shadow-md transition-all duration-200;
   }
-  
-  .glow-border {
-    box-shadow: 0 0 15px -3px rgba(99, 102, 241, 0.4);
-    @apply border-indigo-500/50;
+
+  .corp-panel {
+    @apply bg-white border border-slate-200/80 rounded-xl;
+  }
+
+  .corp-table-header {
+    @apply bg-slate-50 text-slate-600 text-xs font-semibold uppercase tracking-wider border-b border-slate-200;
+  }
+
+  .badge-primary {
+    @apply bg-blue-50 text-blue-700 border border-blue-200 text-xs font-semibold px-2.5 py-0.5 rounded-full;
+  }
+
+  .badge-success {
+    @apply bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-semibold px-2.5 py-0.5 rounded-full;
+  }
+
+  .badge-warning {
+    @apply bg-amber-50 text-amber-700 border border-amber-200 text-xs font-semibold px-2.5 py-0.5 rounded-full;
+  }
+
+  .badge-danger {
+    @apply bg-rose-50 text-rose-700 border border-rose-200 text-xs font-semibold px-2.5 py-0.5 rounded-full;
+  }
+
+  .badge-slate {
+    @apply bg-slate-100 text-slate-700 border border-slate-200 text-xs font-semibold px-2.5 py-0.5 rounded-full;
   }
 }

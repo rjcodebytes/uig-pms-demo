@@ -2,9 +2,11 @@ import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/mongodb';
 import ProcDocument from '@/models/Document';
 
-export async function GET(req, { params }) {
+export async function GET(req, context) {
   await dbConnect();
-  const doc = await ProcDocument.findById(params.id);
+  const params = await context?.params;
+  const id = params?.id;
+  const doc = await ProcDocument.findById(id);
   if (!doc || !doc.documents) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   return new NextResponse(doc.documents, {

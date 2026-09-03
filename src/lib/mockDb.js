@@ -1,44 +1,132 @@
 // src/lib/mockDb.js
 // Persistent in-memory store for Next.js development server
-// This simulates a live database for the local demo.
 
 if (!global._mockDb) {
   global._mockDb = {
     requests: [
       {
-        _id: '1',
-        ticketId: 'REQ-2024-001',
-        requester: 'Mohammed Al-Saud',
-        department: 'Operations',
+        _id: '6a98f6587e392254cc94e794',
+        ticketId: 'PR-2026-88101',
+        requester: {
+          name: 'Eng. Mohammed Al-Saud (Site Lead)',
+          email: 'm.alsaud@uig.com',
+          department: 'Site Civil Engineering',
+          mobile: '+966 50 112 3344',
+        },
+        project: {
+          projectId: 'PRJ-RYD-METRO',
+          projectName: 'Riyadh Metro Extension Phase 2',
+          allocatedBudget: 350000,
+          client: 'Royal Commission for Riyadh City',
+        },
         location: 'Riyadh',
-        project: { projectId: 'PRJ-RYD-01', projectName: 'Riyadh Metro Expansion' },
-        itemDetails: { name: 'Industrial Safety Helmets', category: 'Safety', quantity: 500 },
-        status: 'Quotation_Collection',
+        itemDetails: {
+          name: 'EN397 Industrial Safety Helmets',
+          category: 'Industrial & Safety Equipment',
+          description: 'ANSI/ISEA Z89.1 certified heavy-duty site helmets with 4-point chin straps.',
+          quantity: 500,
+          unit: 'Units',
+          targetPrice: 45,
+        },
+        status: 'Incoming',
         priority: 'High',
-        timeline: [{ status: 'Incoming', date: new Date().toISOString(), notes: 'Created via WhatsApp' }],
-        vendorQuotations: []
+        assignedTo: {
+          name: 'Riyadh Central Procurement Desk',
+          desk: 'Riyadh Central Hub',
+          officer: 'Tariq Al-Mansoor',
+        },
+        timeline: [
+          {
+            stage: 'Incoming',
+            status: 'Incoming',
+            date: new Date().toISOString(),
+            notes: 'Requisition ingested via WhatsApp Bot from site engineer.',
+            actor: 'WhatsApp Bot Ingestion',
+          },
+        ],
+        quotations: [],
       },
       {
-        _id: '2',
-        ticketId: 'REQ-2024-002',
-        requester: 'Fatima Al-Hassan',
-        department: 'IT',
+        _id: '6a98f6587e392254cc94e795',
+        ticketId: 'PR-2026-88102',
+        requester: {
+          name: 'Fahad Al-Harbi (IT Systems Lead)',
+          email: 'f.harbi@uig.com',
+          department: 'IT Infrastructure & Telecom',
+          mobile: '+966 55 998 8776',
+        },
+        project: {
+          projectId: 'PRJ-JED-COAST',
+          projectName: 'Jeddah Coastal Tower Network Expansion',
+          allocatedBudget: 120000,
+          client: 'Jeddah Waterfront Authority',
+        },
         location: 'Jeddah',
-        project: { projectId: 'PRJ-JED-05', projectName: 'HQ Network Upgrade' },
-        itemDetails: { name: 'Cisco Core Switches', category: 'IT', quantity: 4 },
+        itemDetails: {
+          name: 'Cisco Catalyst 9300 48-Port PoE+',
+          category: 'IT Hardware & Networking',
+          description: 'Network switches with redundant power supply and Cisco DNA Center license.',
+          quantity: 4,
+          unit: 'Units',
+          targetPrice: 18500,
+        },
         status: 'Technical_Approval',
         priority: 'Critical',
-        timeline: [
-          { status: 'Incoming', date: new Date().toISOString() },
-          { status: 'Quotation_Collection', date: new Date().toISOString() }
+        assignedTo: {
+          name: 'Western Province Procurement Desk',
+          desk: 'Jeddah Regional Office',
+          officer: 'Fahad Al-Harbi',
+        },
+        quotations: [
+          {
+            vendorName: 'Al-Jazirah Technology Solutions',
+            totalPrice: 74000,
+            unitPrice: 18500,
+            leadTimeDays: 4,
+            specificationsText: 'Official Cisco Tier-1 KSA Partner stock, 3-year DNA Premier, next business day replacement.',
+            warrantyTerms: '36 Months ProSupport',
+            isChosen: true,
+            quotationDocUrl: '/docs/quote-aljazirah-switch.pdf',
+          },
+          {
+            vendorName: 'Jarir Marketing Co. (Commercial)',
+            totalPrice: 76000,
+            unitPrice: 19000,
+            leadTimeDays: 7,
+            specificationsText: 'Cisco Catalyst 9300 enterprise switches with standard local warranty.',
+            warrantyTerms: '24 Months Standard',
+            isChosen: false,
+            quotationDocUrl: '/docs/quote-jarir-switch.pdf',
+          },
+          {
+            vendorName: 'Saudi Modern Electronics',
+            totalPrice: 78500,
+            unitPrice: 19625,
+            leadTimeDays: 10,
+            specificationsText: 'Compliant OEM network units with manufacturer warranty.',
+            warrantyTerms: '12 Months Standard',
+            isChosen: false,
+            quotationDocUrl: '/docs/quote-sme-switch.pdf',
+          },
         ],
-        vendorQuotations: [
-          { vendorName: 'Al-Jazirah Tech', totalPrice: 45000, leadTimeDays: 14, specificationsText: 'Enterprise grade Cisco switches.', quotationDocUrl: '#', isChosen: false },
-          { vendorName: 'Saudi IT Solutions', totalPrice: 42000, leadTimeDays: 21, specificationsText: 'Refurbished Cisco switches.', quotationDocUrl: '#', isChosen: false },
-          { vendorName: 'Global Net KSA', totalPrice: 46000, leadTimeDays: 7, specificationsText: 'Latest gen Cisco switches.', quotationDocUrl: '#', isChosen: false }
-        ]
-      }
-    ]
+        timeline: [
+          {
+            stage: 'Incoming',
+            status: 'Incoming',
+            date: new Date().toISOString(),
+            notes: 'Requisition created by IT lead for network switches.',
+            actor: 'Fahad Al-Harbi',
+          },
+          {
+            stage: 'Quotation_Collection',
+            status: 'Quotation_Collection',
+            date: new Date().toISOString(),
+            notes: 'Collected 3 verified commercial quotes from approved KSA vendors.',
+            actor: 'Procurement Desk',
+          },
+        ],
+      },
+    ],
   };
 }
 
