@@ -72,7 +72,8 @@ export async function POST(req) {
 
     // Database path with fallback (Issue 6)
     try {
-      await dbConnect();
+      const conn = await dbConnect();
+      if (!conn) throw new Error('MongoDB is offline');
       const newVendor = await Vendor.create(vendorPayload);
       return NextResponse.json({ success: true, data: newVendor }, { status: 201 });
     } catch (dbErr) {

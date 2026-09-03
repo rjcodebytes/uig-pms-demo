@@ -16,7 +16,10 @@ import {
   Layers,
   FileText,
   AlertCircle,
-  HelpCircle
+  HelpCircle,
+  RotateCcw,
+  LayoutDashboard,
+  FileCheck2
 } from 'lucide-react';
 
 export default function NewRequestPage() {
@@ -100,11 +103,14 @@ export default function NewRequestPage() {
       });
 
       const data = await res.json();
-      if (data.success) {
+      if (data.success && data.data) {
         setSuccessTicket(data.data);
+      } else {
+        alert(data.message || 'Failed to create requisition ticket. Please verify inputs.');
       }
     } catch (err) {
       console.error(err);
+      alert('Network or server error creating requisition.');
     }
     setLoading(false);
   };
@@ -137,7 +143,7 @@ export default function NewRequestPage() {
           category: formData.category,
           quantity: Number(formData.quantity),
           unit: formData.unit,
-          targetPrice: Number(formData.targetPrice),
+          targetPrice: formData.targetPrice !== '' ? Number(formData.targetPrice) : undefined,
           description: formData.description,
         },
         priority: formData.priority,
@@ -151,11 +157,14 @@ export default function NewRequestPage() {
       });
 
       const data = await res.json();
-      if (data.success) {
+      if (data.success && data.data) {
         setSuccessTicket(data.data);
+      } else {
+        alert(data.message || 'Failed to create requisition. Please check required fields.');
       }
     } catch (err) {
       console.error(err);
+      alert('Network or server error creating requisition.');
     }
     setLoading(false);
   };
@@ -167,129 +176,207 @@ export default function NewRequestPage() {
       <div className="pb-4 border-b border-slate-200">
         <h1 className="text-2xl font-black text-slate-900 tracking-tight flex items-center">
           <FilePlus2 className="w-6 h-6 mr-2 text-blue-700" />
-          Create Material Requisition (PR)
+          {successTicket ? 'Requisition Registration Receipt' : 'Create Material Requisition (PR)'}
         </h1>
         <p className="text-xs text-slate-500 mt-1">
-          Initiate a compliant procurement request with mandatory business justification, required quantities, and automated regional desk routing.
+          {successTicket
+            ? 'Official confirmation and tracking details for your newly registered procurement requisition.'
+            : 'Initiate a compliant procurement request with mandatory business justification, required quantities, and automated regional desk routing.'}
         </p>
       </div>
 
-      {/* Mode Selector Tabs */}
-      <div className="flex items-center space-x-2 bg-slate-100 p-1.5 rounded-xl border border-slate-200">
-        <button
-          onClick={() => { setActiveTab('whatsapp'); setSuccessTicket(null); }}
-          className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition flex items-center justify-center space-x-2 cursor-pointer ${
-            activeTab === 'whatsapp' ? 'bg-emerald-700 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
-          }`}
-        >
-          <MessageSquare className="w-4 h-4" />
-          <span>WhatsApp / Site Voice Ingestion Simulator</span>
-        </button>
-
-        <button
-          onClick={() => { setActiveTab('manual'); setSuccessTicket(null); }}
-          className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition flex items-center justify-center space-x-2 cursor-pointer ${
-            activeTab === 'manual' ? 'bg-blue-700 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
-          }`}
-        >
-          <Layers className="w-4 h-4" />
-          <span>Standard Enterprise Requisition Form</span>
-        </button>
-      </div>
-
-      {/* Success Notification Banner */}
-      {successTicket && (
-        <div className="bg-emerald-50 border-2 border-emerald-500 rounded-2xl p-6 shadow-sm animate-in fade-in">
-          <div className="flex items-start justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center">
-                <CheckCircle2 className="w-6 h-6" />
-              </div>
-              <div>
-                <h3 className="font-black text-slate-900 text-base">
-                  Requisition Created: {successTicket.ticketId}
-                </h3>
-                <p className="text-xs text-slate-600 mt-0.5">
-                  Subject: <strong className="text-slate-900">{successTicket.subject || successTicket.itemDetails?.name}</strong>
-                </p>
-                <p className="text-xs text-slate-600 mt-0.5">
-                  Assigned Desk: <span className="font-bold text-blue-700">{successTicket.assignedTo?.name || 'Riyadh Central Desk'}</span> ({successTicket.location})
-                </p>
-              </div>
+      {/* DEDICATED COMPLETION SCREEN (When ticket is successfully created) */}
+      {successTicket ? (
+        <div className="bg-white border-2 border-emerald-500 rounded-3xl p-8 shadow-md space-y-6 animate-in fade-in duration-300">
+          
+          {/* Header Celebration */}
+          <div className="text-center space-y-3 pb-6 border-b border-slate-100">
+            <div className="w-16 h-16 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center mx-auto shadow-inner">
+              <CheckCircle2 className="w-10 h-10" />
             </div>
-
-            <Link
-              href={`/procurement/request/${successTicket.ticketId || successTicket._id}`}
-              className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold shadow-xs transition flex items-center space-x-1"
-            >
-              <span>Track Ticket Lifecycle</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
-          </div>
-        </div>
-      )}
-
-      {/* TAB 1: WhatsApp Ingestion Simulator */}
-      {activeTab === 'whatsapp' && (
-        <div className="corp-card p-6 border-2 border-emerald-500/80 shadow-sm space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
             <div>
-              <div className="badge-primary mb-1 bg-emerald-100 text-emerald-800 border-emerald-300">
-                AI Ingestion Channel
-              </div>
-              <h2 className="text-base font-black text-slate-900 flex items-center">
-                <Sparkles className="w-4 h-4 mr-1.5 text-emerald-600" />
-                WhatsApp Voice / Chat NLP Parser Simulator
+              <span className="inline-block bg-emerald-100 text-emerald-800 text-[11px] font-extrabold uppercase tracking-wider px-3 py-1 rounded-full border border-emerald-200">
+                ✓ Requisition Officially Registered
+              </span>
+              <h2 className="text-2xl font-black text-slate-900 mt-2">
+                Requisition Submitted Successfully!
               </h2>
-            </div>
-            <span className="text-[11px] font-bold text-slate-400">Site Engineer Voice Mock</span>
-          </div>
-
-          <form onSubmit={handleWhatsappSubmit} className="space-y-4">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                WhatsApp Chat Message / Audio Transcript from Field:
-              </label>
-              <textarea
-                rows={4}
-                value={whatsappMessage}
-                onChange={(e) => setWhatsappMessage(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs font-medium text-slate-900 focus:outline-none focus:border-emerald-600 focus:bg-white"
-                required
-              />
-              <p className="text-[11px] text-slate-400 mt-1">
-                NLP Engine automatically extracts: <strong className="text-slate-700">Item (Helmets), Qty (500), Urgency (Next Tuesday), City (Riyadh), and Project Justification.</strong>
+              <p className="text-xs text-slate-500 max-w-lg mx-auto mt-1">
+                Your material requisition has been ingested into the system and assigned to the regional desk for tender quotations collection.
               </p>
             </div>
 
-            <div className="p-3 bg-emerald-50/70 border border-emerald-200 rounded-xl text-xs text-emerald-900 space-y-1">
-              <div className="font-bold flex items-center">
-                <ShieldCheck className="w-4 h-4 mr-1.5 text-emerald-700" />
-                Automated Requirement & Business Justification Extraction:
+            {/* Official Ticket Pill */}
+            <div className="inline-flex items-center space-x-2 bg-slate-50 border border-slate-300 px-4 py-2 rounded-xl text-sm font-black text-blue-800 shadow-xs">
+              <FileCheck2 className="w-4 h-4 text-blue-700" />
+              <span>Tracking Number: {successTicket.ticketId || successTicket._id}</span>
+            </div>
+          </div>
+
+          {/* Key Requisition Summary Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-2 text-xs">
+              <div className="font-extrabold text-slate-900 flex items-center text-sm">
+                <Package className="w-4 h-4 mr-1.5 text-blue-700" />
+                Material & Item Details
               </div>
-              <div className="text-[11px] text-slate-700">
-                • <strong>Subject:</strong> 500 Heavy-Duty EN397 Safety Helmets<br />
-                • <strong>Why Required:</strong> Mandatory OSHA PPE compliance for 500 new subterranean tunneling workers.<br />
-                • <strong>Auto-Routing:</strong> Ingested into <strong>Riyadh Central Procurement Desk</strong> under Eng. Mohammed Al-Saud.
+              <div className="space-y-1.5 text-slate-600 pt-1">
+                <div>Subject: <strong className="text-slate-900">{successTicket.subject || successTicket.itemDetails?.name}</strong></div>
+                <div>Item Name: <strong className="text-slate-900">{successTicket.itemDetails?.name}</strong></div>
+                <div>Quantity: <strong className="text-slate-900">{successTicket.itemDetails?.quantity} {successTicket.itemDetails?.unit || 'Units'}</strong></div>
+                <div>Category: <strong className="text-slate-900">{successTicket.itemDetails?.category}</strong></div>
+                {successTicket.itemDetails?.targetPrice && (
+                  <div>Target Unit Price: <strong className="text-emerald-700">{successTicket.itemDetails?.targetPrice} SAR</strong></div>
+                )}
               </div>
             </div>
 
-            <div className="flex justify-end pt-2">
-              <button
-                type="submit"
-                disabled={loading}
-                className="px-6 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold shadow-md transition flex items-center space-x-2 cursor-pointer disabled:opacity-50"
+            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-2 text-xs">
+              <div className="font-extrabold text-slate-900 flex items-center text-sm">
+                <Building2 className="w-4 h-4 mr-1.5 text-blue-700" />
+                Project & Regional Sourcing Desk
+              </div>
+              <div className="space-y-1.5 text-slate-600 pt-1">
+                <div>Project: <strong className="text-slate-900">{successTicket.project?.projectName}</strong> ({successTicket.project?.projectId})</div>
+                <div>Location / Hub: <strong className="text-slate-900">{successTicket.location}</strong></div>
+                <div>Assigned Desk: <strong className="text-blue-700">{successTicket.assignedTo?.name || 'Riyadh Central Procurement Desk'}</strong></div>
+                <div>Officer: <strong className="text-slate-800">{successTicket.assignedTo?.officer || 'Tariq Al-Mansoor'}</strong></div>
+                <div>Priority: <span className="font-bold text-rose-700">{successTicket.priority}</span></div>
+              </div>
+            </div>
+          </div>
+
+          {/* Next Pipeline Stage Card */}
+          <div className="p-4 bg-blue-50 border border-blue-200 rounded-2xl flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="w-8 h-8 rounded-full bg-blue-700 text-white flex items-center justify-center font-black text-xs shrink-0">
+                2
+              </div>
+              <div>
+                <div className="text-xs font-black text-blue-900">Current Next Step: 3-Bid Tender Quotations Sourcing</div>
+                <div className="text-[11px] text-blue-700">Collect or review 3 competitive supplier bids before technical engineering sign-off.</div>
+              </div>
+            </div>
+            <span className="text-[10px] font-bold bg-blue-100 text-blue-800 px-3 py-1 rounded-full border border-blue-300 shrink-0">
+              Ready for Sourcing
+            </span>
+          </div>
+
+          {/* Primary Action Buttons */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-slate-100">
+            <button
+              onClick={() => { setSuccessTicket(null); }}
+              className="w-full sm:w-auto px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1.5 cursor-pointer"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>+ Create Another Requisition</span>
+            </button>
+
+            <div className="flex items-center space-x-3 w-full sm:w-auto">
+              <Link
+                href="/procurement/dashboard"
+                className="flex-1 sm:flex-initial px-5 py-2.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1.5 shadow-xs"
               >
-                <Send className="w-3.5 h-3.5" />
-                <span>{loading ? 'Parsing Message with AI...' : 'Simulate Incoming WhatsApp PR Ticket'}</span>
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
+                <LayoutDashboard className="w-3.5 h-3.5" />
+                <span>Go to Dashboard</span>
+              </Link>
 
-      {/* TAB 2: Standard Enterprise Requisition Form */}
-      {activeTab === 'manual' && (
+              <Link
+                href={`/procurement/request/${successTicket.ticketId || successTicket._id}`}
+                className="flex-1 sm:flex-initial px-6 py-2.5 bg-blue-700 hover:bg-blue-800 text-white rounded-xl text-xs font-bold shadow-md transition flex items-center justify-center space-x-2"
+              >
+                <span>Open Sourcing & Tender Desk</span>
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* Mode Selector Tabs */}
+          <div className="flex items-center space-x-2 bg-slate-100 p-1.5 rounded-xl border border-slate-200">
+            <button
+              onClick={() => { setActiveTab('whatsapp'); setSuccessTicket(null); }}
+              className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition flex items-center justify-center space-x-2 cursor-pointer ${
+                activeTab === 'whatsapp' ? 'bg-emerald-700 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <MessageSquare className="w-4 h-4" />
+              <span>WhatsApp / Site Voice Ingestion Simulator</span>
+            </button>
+
+            <button
+              onClick={() => { setActiveTab('manual'); setSuccessTicket(null); }}
+              className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition flex items-center justify-center space-x-2 cursor-pointer ${
+                activeTab === 'manual' ? 'bg-blue-700 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Layers className="w-4 h-4" />
+              <span>Standard Enterprise Requisition Form</span>
+            </button>
+          </div>
+
+          {/* TAB 1: WhatsApp Ingestion Simulator */}
+          {activeTab === 'whatsapp' && (
+            <div className="corp-card p-6 border-2 border-emerald-500/80 shadow-sm space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div>
+                  <div className="badge-primary mb-1 bg-emerald-100 text-emerald-800 border-emerald-300">
+                    AI Ingestion Channel
+                  </div>
+                  <h2 className="text-base font-black text-slate-900 flex items-center">
+                    <Sparkles className="w-4 h-4 mr-1.5 text-emerald-600" />
+                    WhatsApp Voice / Chat NLP Parser Simulator
+                  </h2>
+                </div>
+                <span className="text-[11px] font-bold text-slate-400">Site Engineer Voice Mock</span>
+              </div>
+
+              <form onSubmit={handleWhatsappSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    WhatsApp Chat Message / Audio Transcript from Field:
+                  </label>
+                  <textarea
+                    rows={4}
+                    value={whatsappMessage}
+                    onChange={(e) => setWhatsappMessage(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs font-medium text-slate-900 focus:outline-none focus:border-emerald-600 focus:bg-white"
+                    required
+                  />
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    NLP Engine automatically extracts: <strong className="text-slate-700">Item (Helmets), Qty (500), Urgency (Next Tuesday), City (Riyadh), and Project Justification.</strong>
+                  </p>
+                </div>
+
+                <div className="p-3 bg-emerald-50/70 border border-emerald-200 rounded-xl text-xs text-emerald-900 space-y-1">
+                  <div className="font-bold flex items-center">
+                    <ShieldCheck className="w-4 h-4 mr-1.5 text-emerald-700" />
+                    Automated Requirement & Business Justification Extraction:
+                  </div>
+                  <div className="text-[11px] text-slate-700">
+                    • <strong>Subject:</strong> 500 Heavy-Duty EN397 Safety Helmets<br />
+                    • <strong>Why Required:</strong> Mandatory OSHA PPE compliance for 500 new subterranean tunneling workers.<br />
+                    • <strong>Auto-Routing:</strong> Ingested into <strong>Riyadh Central Procurement Desk</strong> under Eng. Mohammed Al-Saud.
+                  </div>
+                </div>
+
+                <div className="flex justify-end pt-2">
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="px-6 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold shadow-md transition flex items-center space-x-2 cursor-pointer disabled:opacity-50"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    <span>{loading ? 'Parsing Message with AI...' : 'Simulate Incoming WhatsApp PR Ticket'}</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+
+          {/* TAB 2: Standard Enterprise Requisition Form */}
+          {activeTab === 'manual' && (
         <form onSubmit={handleManualSubmit} className="space-y-6">
           
           {/* SECTION 1: Mandatory Subject & Business Justification */}
@@ -523,6 +610,8 @@ export default function NewRequestPage() {
           </div>
 
         </form>
+      )}
+        </>
       )}
 
     </div>

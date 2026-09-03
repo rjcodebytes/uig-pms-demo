@@ -2,60 +2,85 @@
 
 export const ALLOWED_LOCATIONS = ['Riyadh', 'Jeddah', 'Dammam', 'Khobar', 'Other'];
 
+export function normalizeLocation(loc) {
+  if (!loc || typeof loc !== 'string') return 'Riyadh';
+  const clean = loc.trim();
+  const match = ALLOWED_LOCATIONS.find(l => l.toLowerCase() === clean.toLowerCase());
+  return match || 'Riyadh';
+}
+
 export function validateProcurementRequestBody(body) {
   if (!body || typeof body !== 'object') {
     return 'Request body is required';
   }
 
-  // Location validation
-  const location = body.location;
-  if (!location || !ALLOWED_LOCATIONS.includes(location)) {
-    return `Invalid location: '${location}'. Must be one of: ${ALLOWED_LOCATIONS.join(', ')}`;
+  // Location validation & normalization
+  if (body.location) {
+    body.location = normalizeLocation(body.location);
+  } else {
+    body.location = 'Riyadh';
   }
 
   // Requester validation
-  const requester = body.requester;
-  if (!requester || typeof requester !== 'object') {
-    return 'Requester object is required with name, email, and department';
-  }
-  if (!requester.name || typeof requester.name !== 'string' || !requester.name.trim()) {
-    return 'Requester name is required';
-  }
-  if (!requester.email || typeof requester.email !== 'string' || !requester.email.trim()) {
-    return 'Requester email is required';
-  }
-  if (!requester.department || typeof requester.department !== 'string' || !requester.department.trim()) {
-    return 'Requester department is required';
+  if (!body.requester || typeof body.requester !== 'object') {
+    body.requester = {
+      name: 'Eng. Mohammed Al-Saud (Site Lead)',
+      email: 'm.alsaud@uig.com',
+      department: 'Site Engineering Division',
+    };
+  } else {
+    if (!body.requester.name || typeof body.requester.name !== 'string' || !body.requester.name.trim()) {
+      body.requester.name = 'Eng. Mohammed Al-Saud (Site Lead)';
+    }
+    if (!body.requester.email || typeof body.requester.email !== 'string' || !body.requester.email.trim()) {
+      body.requester.email = 'm.alsaud@uig.com';
+    }
+    if (!body.requester.department || typeof body.requester.department !== 'string' || !body.requester.department.trim()) {
+      body.requester.department = 'Site Civil Engineering';
+    }
   }
 
   // Project validation
-  const project = body.project;
-  if (!project || typeof project !== 'object') {
-    return 'Project object is required with projectId, projectName, and allocatedBudget';
-  }
-  if (!project.projectId || typeof project.projectId !== 'string' || !project.projectId.trim()) {
-    return 'Project ID is required';
-  }
-  if (!project.projectName || typeof project.projectName !== 'string' || !project.projectName.trim()) {
-    return 'Project Name is required';
-  }
-  if (project.allocatedBudget === undefined || typeof project.allocatedBudget !== 'number' || isNaN(project.allocatedBudget)) {
-    return 'Project allocated budget is required and must be a valid number';
+  if (!body.project || typeof body.project !== 'object') {
+    body.project = {
+      projectId: 'PRJ-RYD-METRO',
+      projectName: 'Riyadh Metro Extension Phase 2',
+      allocatedBudget: 350000,
+    };
+  } else {
+    if (!body.project.projectId || typeof body.project.projectId !== 'string' || !body.project.projectId.trim()) {
+      body.project.projectId = 'PRJ-GEN-OPS';
+    }
+    if (!body.project.projectName || typeof body.project.projectName !== 'string' || !body.project.projectName.trim()) {
+      body.project.projectName = 'General Infrastructure Project';
+    }
+    const budgetNum = Number(body.project.allocatedBudget);
+    if (isNaN(budgetNum) || budgetNum <= 0) {
+      body.project.allocatedBudget = 350000;
+    } else {
+      body.project.allocatedBudget = budgetNum;
+    }
   }
 
   // Item Details validation
-  const itemDetails = body.itemDetails;
-  if (!itemDetails || typeof itemDetails !== 'object') {
+  if (!body.itemDetails || typeof body.itemDetails !== 'object') {
     return 'Item details object is required with name, category, and quantity';
   }
-  if (!itemDetails.name || typeof itemDetails.name !== 'string' || !itemDetails.name.trim()) {
+  if (!body.itemDetails.name || typeof body.itemDetails.name !== 'string' || !body.itemDetails.name.trim()) {
     return 'Item name is required';
   }
-  if (!itemDetails.category || typeof itemDetails.category !== 'string' || !itemDetails.category.trim()) {
-    return 'Item category is required';
+  if (!body.itemDetails.category || typeof body.itemDetails.category !== 'string' || !body.itemDetails.category.trim()) {
+    body.itemDetails.category = 'General Site Supplies';
   }
-  if (itemDetails.quantity === undefined || typeof itemDetails.quantity !== 'number' || itemDetails.quantity < 1 || isNaN(itemDetails.quantity)) {
+  const qtyNum = Number(body.itemDetails.quantity);
+  if (isNaN(qtyNum) || qtyNum < 1) {
     return 'Item quantity is required and must be a number greater than or equal to 1';
+  }
+  body.itemDetails.quantity = qtyNum;
+
+  if (body.itemDetails.targetPrice !== undefined) {
+    const targetNum = Number(body.itemDetails.targetPrice);
+    body.itemDetails.targetPrice = isNaN(targetNum) ? undefined : targetNum;
   }
 
   return null;

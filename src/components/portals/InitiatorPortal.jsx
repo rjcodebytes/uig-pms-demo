@@ -17,18 +17,13 @@ import {
 } from 'lucide-react';
 
 export default function InitiatorPortal({ requests = [] }) {
-  // Filter for requests belonging to the initiator
-  const myRequests = requests.filter(
-    (r) =>
-      r.requester?.name?.toLowerCase().includes('mohammed') ||
-      r.status === 'Incoming' ||
-      r.status === 'Quotation_Collection' ||
-      r.status === 'Delivery_Pending'
-  );
+  // Initiator view: Display all site procurement requests
+  const myRequests = requests;
 
   const pendingQuoteSelection = myRequests.filter((r) => r.status === 'Quotation_Collection');
-  const awaitingDelivery = myRequests.filter((r) => r.status === 'Delivery_Pending');
-  const inSourcing = myRequests.filter((r) => r.status === 'Incoming' || r.status === 'Technical_Approval' || r.status === 'Finance_Review' || r.status === 'PO_Generated');
+  const awaitingDelivery = myRequests.filter((r) => r.status === 'PO_Generated' && !r.deliveryConfirmation?.receivedAt);
+  const awaitingFinancePayment = myRequests.filter((r) => r.status === 'Delivery_Pending');
+  const inSourcing = myRequests.filter((r) => r.status === 'Incoming' || r.status === 'Quotation_Collection' || r.status === 'Technical_Approval' || r.status === 'Finance_Review');
   const completed = myRequests.filter((r) => r.status === 'Completed');
 
   return (

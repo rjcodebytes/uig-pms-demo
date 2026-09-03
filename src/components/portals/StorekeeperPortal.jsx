@@ -25,8 +25,8 @@ export default function StorekeeperPortal({ requests = [] }) {
     setLocalRequests(requests);
   }, [requests]);
 
-  const awaitingInspection = localRequests.filter((r) => r.status === 'Delivery_Pending');
-  const expectedInbound = localRequests.filter((r) => r.status === 'PO_Generated');
+  const awaitingInspection = localRequests.filter((r) => r.status === 'PO_Generated' && !r.deliveryConfirmation?.receivedAt);
+  const inFinanceMatching = localRequests.filter((r) => r.status === 'Delivery_Pending');
   const completedDeliveries = localRequests.filter((r) => r.status === 'Completed');
 
   const handleConfirmGRN = async (reqId) => {
@@ -140,34 +140,37 @@ export default function StorekeeperPortal({ requests = [] }) {
           </div>
         </div>
 
-        {/* Expected Inbound POs */}
+        {/* Signed GRNs with Finance */}
         <div className="corp-card p-5 border border-slate-200 shadow-xs">
           <div className="flex items-center justify-between mb-2">
-            <span className="badge-slate font-bold">In Transit</span>
-            <span className="text-xs font-bold text-slate-700">{expectedInbound.length} Inbound</span>
+            <span className="badge-slate font-bold">With Finance</span>
+            <span className="text-xs font-bold text-slate-700">{inFinanceMatching.length} GRNs Signed</span>
           </div>
-          <h3 className="font-extrabold text-slate-900 text-base">Dispatched Purchase Orders Expected</h3>
-          <p className="text-xs text-slate-500 mb-3">Suppliers currently packaging/transit for delivery to site depots.</p>
+          <h3 className="font-extrabold text-slate-900 text-base">GRN Signed — In 3-Way Match Queue</h3>
+          <p className="text-xs text-slate-500 mb-3">Goods received on-site. Currently awaiting Finance Controller wire payment release.</p>
 
           <div className="space-y-2">
-            {expectedInbound.map((req) => {
+            {inFinanceMatching.map((req) => {
               const targetUrl = `/procurement/request/${req.ticketId || req._id}`;
 
               return (
                 <div key={req._id || req.ticketId} className="bg-slate-50 border border-slate-200 p-3 rounded-xl flex items-center justify-between">
                   <div>
-                    <div className="font-bold text-slate-900 text-xs">{req.purchaseOrder?.poNumber || 'PO-2026-ACTIVE'} • {req.itemDetails?.name}</div>
-                    <div className="text-[11px] text-slate-500">Destination: {req.location} Depot</div>
+                    <div className="font-bold text-slate-900 text-xs">{req.ticketId} • {req.itemDetails?.name}</div>
+                    <div className="text-[11px] text-emerald-700 font-semibold">✓ GRN Signed ({req.deliveryConfirmation?.recipientSignatureName || 'Site Receiver'})</div>
                   </div>
                   <Link
                     href={targetUrl}
                     className="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-bold rounded-lg transition"
                   >
-                    View PO &rarr;
+                    View Status &rarr;
                   </Link>
                 </div>
               );
             })}
+            {inFinanceMatching.length === 0 && (
+              <div className="text-center py-6 text-slate-400 text-xs">No GRNs currently in finance review</div>
+            )}
           </div>
         </div>
 

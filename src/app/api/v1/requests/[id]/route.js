@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 import dbConnect from '@/lib/mongodb';
 import ProcurementRequest from '@/models/ProcurementRequest';
 import { mockDb } from '@/lib/mockDb';
+import { sanitizeQuotations } from '@/lib/sanitizeQuotations';
 
 export async function GET(req, context) {
   try {
@@ -65,6 +66,10 @@ export async function PUT(req, context) {
       body.quotations = body.vendorQuotations;
     }
 
+    if (body.quotations && Array.isArray(body.quotations)) {
+      body.quotations = sanitizeQuotations(body.quotations, body.itemDetails?.quantity || 1);
+    }
+
     try {
       await dbConnect();
       const orConditions = [
@@ -81,6 +86,10 @@ export async function PUT(req, context) {
         { new: true }
       );
       if (request) {
+        const mIdx = mockDb.requests.findIndex(r => r._id === id || r.ticketId === id || r.ticketId === id.toUpperCase());
+        if (mIdx !== -1) {
+          mockDb.requests[mIdx] = request.toObject ? request.toObject() : request;
+        }
         return NextResponse.json({ success: true, data: request }, { status: 200 });
       }
     } catch (dbErr) {

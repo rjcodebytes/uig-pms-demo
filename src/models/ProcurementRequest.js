@@ -123,6 +123,8 @@ const ProcurementRequestSchema = new mongoose.Schema(
       poDocumentUrl: { type: String, default: '/docs/po-sample.pdf' },
     },
     deliveryConfirmation: {
+      driverName: { type: String, default: 'Supplier Courier Representative' },
+      waybillNumber: { type: String },
       signedNoteUrl: { type: String },
       receivedAt: { type: Date },
       recipientSignatureName: { type: String },

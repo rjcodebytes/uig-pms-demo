@@ -11,16 +11,18 @@ async function dbConnect() {
   }
 
   try {
-    if (!cached.promise || mongoose.connection.readyState === 0) {
+    if (!cached.promise || mongoose.connection.readyState !== 1) {
       cached.promise = mongoose.connect(MONGODB_URI, {
         bufferCommands: false,
-        serverSelectionTimeoutMS: 5000,
+        serverSelectionTimeoutMS: 3000,
+      }).then((m) => {
+        return m.connection;
       });
     }
     cached.conn = await cached.promise;
     return cached.conn;
   } catch (error) {
-    console.error('Failed to connect to MongoDB, falling back to offline mode:', error.message);
+    console.warn('[DB] MongoDB connection unavailable:', error.message);
     cached.promise = null;
     cached.conn = null;
     return null;

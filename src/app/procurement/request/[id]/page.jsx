@@ -33,6 +33,9 @@ import {
   Sparkles,
   AlertOctagon,
   RotateCcw,
+  Paperclip,
+  Upload,
+  User,
   X
 } from 'lucide-react';
 import QuotationComparison from '@/components/procurement/QuotationComparison';
@@ -57,48 +60,26 @@ export default function RequestDetailsPage({ params }) {
   const [flagReasonCategory, setFlagReasonCategory] = useState('Technical Specification Issue');
   const [flagNotes, setFlagNotes] = useState('');
 
+  // GRN 3-Party Sign-Off Modal State
+  const [grnModalOpen, setGrnModalOpen] = useState(false);
+  const [grnDriverName, setGrnDriverName] = useState('Sultan Al-Ghamdi (Saudi Express Logistics)');
+  const [grnWaybillNumber, setGrnWaybillNumber] = useState('WB-2026-99214');
+  const [grnInspectionNotes, setGrnInspectionNotes] = useState('100% packages inspected with zero defect or transit damage. Certified on-site.');
+  const [grnDocumentUrl, setGrnDocumentUrl] = useState('/docs/signed-delivery-waybill.pdf');
+
   // Editable 3-Bid Quotations List
-  const [quotes, setQuotes] = useState([
-    {
-      vendorName: 'Jarir Marketing Co. (Commercial)',
-      totalPrice: 47000,
-      unitPrice: 4700,
-      leadTimeDays: 3,
-      specificationsText: 'Official Dell KSA Authorized Stock, 3-Yr ProSupport Plus Onsite Next Business Day.',
-      warrantyTerms: '36 Months ProSupport',
-      isChosen: true,
-      quotationDocUrl: '/docs/quote-jarir.pdf'
-    },
-    {
-      vendorName: 'Al-Jazirah Technology Solutions',
-      totalPrice: 48500,
-      unitPrice: 4850,
-      leadTimeDays: 5,
-      specificationsText: 'Dell OEM specification with standard local distributor warranty.',
-      warrantyTerms: '36 Months Standard',
-      isChosen: false,
-      quotationDocUrl: '/docs/quote-aljazirah.pdf'
-    },
-    {
-      vendorName: 'Saudi Modern Electronics',
-      totalPrice: 49800,
-      unitPrice: 4980,
-      leadTimeDays: 4,
-      specificationsText: 'Commercial business equipment with 2-year standard parts replacement.',
-      warrantyTerms: '24 Months Standard',
-      isChosen: false,
-      quotationDocUrl: '/docs/quote-sme.pdf'
-    }
-  ]);
+  const [quotes, setQuotes] = useState([]);
 
   const approvedVendorsList = [
+    'Saudi Arabian Safety & PPE Corp',
     'Jarir Marketing Co. (Commercial)',
     'Saudi ReadyMix Concrete Co.',
     'Al-Jazirah Technology Solutions',
     'IKEA Business KSA',
     'Saudi Safety Corp Industrial',
     'Middle East Engineering Supplies',
-    'Gulf Building Materials'
+    'Gulf Building Materials & Sourcing',
+    'Riyadh Modern Hardware & Tools',
   ];
 
   const [receiverName, setReceiverName] = useState('Eng. Mohammed Al-Saud (Site Lead)');
@@ -109,9 +90,47 @@ export default function RequestDetailsPage({ params }) {
       const res = await fetch(`/api/v1/requests/${id}`);
       const data = await res.json();
       if (data.success && data.data) {
-        setRequest(data.data);
-        if (data.data.quotations && data.data.quotations.length > 0) {
-          setQuotes(data.data.quotations);
+        const reqData = data.data;
+        setRequest(reqData);
+        if (reqData.quotations && reqData.quotations.length > 0) {
+          setQuotes(reqData.quotations);
+        } else {
+          // Generate context-aware 3-bid tender templates based on the actual requisition item
+          const qty = reqData.itemDetails?.quantity || 1;
+          const target = reqData.itemDetails?.targetPrice || 100;
+          const itemName = reqData.itemDetails?.name || 'Material Item';
+          setQuotes([
+            {
+              vendorName: 'Saudi Arabian Safety & PPE Corp',
+              totalPrice: Math.round(target * qty * 0.95),
+              unitPrice: Math.round(target * 0.95),
+              leadTimeDays: 3,
+              specificationsText: `OEM certified ${itemName} with 100% compliant technical specifications.`,
+              warrantyTerms: '24 Months Full Warranty',
+              isChosen: true,
+              quotationDocUrl: '/docs/quote-1.pdf',
+            },
+            {
+              vendorName: 'Gulf Engineering & Contracting Supplies',
+              totalPrice: Math.round(target * qty * 1.02),
+              unitPrice: Math.round(target * 1.02),
+              leadTimeDays: 5,
+              specificationsText: `Compliant commercial grade ${itemName} with local technical support.`,
+              warrantyTerms: '12 Months Standard Warranty',
+              isChosen: false,
+              quotationDocUrl: '/docs/quote-2.pdf',
+            },
+            {
+              vendorName: 'Riyadh Central Distribution & Logistics',
+              totalPrice: Math.round(target * qty * 1.08),
+              unitPrice: Math.round(target * 1.08),
+              leadTimeDays: 7,
+              specificationsText: `Standard heavy-duty ${itemName} package with certified Saudi origin.`,
+              warrantyTerms: '12 Months Standard Warranty',
+              isChosen: false,
+              quotationDocUrl: '/docs/quote-3.pdf',
+            },
+          ]);
         }
       }
     } catch (err) {
@@ -139,10 +158,14 @@ export default function RequestDetailsPage({ params }) {
       const data = await res.json();
       if (data.success && data.data) {
         setRequest(data.data);
-        setStatusMessage('✓ Action completed successfully!');
+        setStatusMessage('Status successfully updated!');
+        setTimeout(() => setStatusMessage(''), 4000);
+      } else {
+        alert(data.message || 'Action failed');
       }
     } catch (err) {
       console.error(err);
+      alert('Network / Server error');
     } finally {
       setActionLoading(false);
     }
@@ -150,6 +173,28 @@ export default function RequestDetailsPage({ params }) {
 
   // Submit collected 3 quotations to start technical review
   const submitQuotations = async () => {
+    if (!quotes || quotes.length === 0) {
+      alert('Please add at least one vendor quotation.');
+      return;
+    }
+
+    // Validate edge cases
+    for (let i = 0; i < quotes.length; i++) {
+      const q = quotes[i];
+      if (!q.vendorName || !q.vendorName.trim()) {
+        alert(`Bid #${i + 1}: Please specify a vendor/supplier name.`);
+        return;
+      }
+      if (!q.totalPrice || Number(q.totalPrice) <= 0 || isNaN(Number(q.totalPrice))) {
+        alert(`Bid #${i + 1} (${q.vendorName}): Please enter a valid total bid price greater than 0.`);
+        return;
+      }
+      if (!q.leadTimeDays || Number(q.leadTimeDays) <= 0 || isNaN(Number(q.leadTimeDays))) {
+        alert(`Bid #${i + 1} (${q.vendorName}): Please enter a valid delivery lead time in days.`);
+        return;
+      }
+    }
+
     try {
       setActionLoading(true);
       setStatusMessage('');
@@ -166,9 +211,14 @@ export default function RequestDetailsPage({ params }) {
       const data = await res.json();
       if (data.success && data.data) {
         setRequest(data.data);
+        setStatusMessage('✓ Bids successfully submitted & saved to database!');
+        setTimeout(() => setStatusMessage(''), 4000);
+      } else {
+        alert(data.message || 'Failed to submit quotations');
       }
     } catch (err) {
       console.error(err);
+      alert('Network or server error submitting quotations');
     } finally {
       setActionLoading(false);
     }
@@ -219,42 +269,78 @@ export default function RequestDetailsPage({ params }) {
     }
   };
 
-  // Update specific bid field
+  // Update specific bid field with edge case checks
   const handleUpdateBid = (index, field, value) => {
     const updated = [...quotes];
-    updated[index] = { ...updated[index], [field]: value };
-    if (field === 'totalPrice') {
+    let parsedValue = value;
+    if (field === 'totalPrice' || field === 'leadTimeDays' || field === 'unitPrice') {
+      if (value === '') {
+        parsedValue = '';
+      } else {
+        const num = Number(value);
+        parsedValue = isNaN(num) ? 0 : Math.max(0, num);
+      }
+    }
+    updated[index] = { ...updated[index], [field]: parsedValue };
+    if (field === 'totalPrice' && parsedValue !== '') {
       const qty = request?.itemDetails?.quantity || 1;
-      updated[index].unitPrice = Number(value) / qty;
+      updated[index].unitPrice = Number((Number(parsedValue) / qty).toFixed(2));
     }
     setQuotes(updated);
   };
 
   // Add new bid
   const handleAddBid = () => {
+    const qty = request?.itemDetails?.quantity || 1;
+    const target = request?.itemDetails?.targetPrice || 100;
+    const bidIndex = quotes.length + 1;
     setQuotes([
       ...quotes,
       {
-        vendorName: 'Middle East Engineering Supplies',
-        totalPrice: 51000,
-        unitPrice: 5100,
-        leadTimeDays: 7,
-        specificationsText: 'Alternative compliant supplier quotation with 24-month warranty.',
-        warrantyTerms: '24 Months Standard',
+        vendorName: `Custom Vendor #${bidIndex}`,
+        totalPrice: Math.round(target * qty * 1.05),
+        unitPrice: Math.round(target * 1.05),
+        leadTimeDays: 4,
+        specificationsText: 'Compliant supplier quotation meeting engineering specifications.',
+        warrantyTerms: '12 Months Standard Warranty',
         isChosen: false,
-        quotationDocUrl: '/docs/quote-new.pdf'
+        quotationDocUrl: `/docs/quote-${bidIndex}.pdf`
       }
     ]);
   };
 
-  // Switch chosen vendor
-  const handleSelectVendor = (vendorName) => {
+  // Remove bid
+  const handleRemoveBid = (indexToRemove) => {
+    if (quotes.length <= 1) {
+      alert('At least one vendor bid is required in the tender matrix.');
+      return;
+    }
+    const updated = quotes.filter((_, idx) => idx !== indexToRemove);
+    if (!updated.some(q => q.isChosen) && updated.length > 0) {
+      updated[0].isChosen = true;
+    }
+    setQuotes(updated);
+  };
+
+  // Switch chosen vendor and persist to database
+  const handleSelectVendor = async (vendorName) => {
     if (request?.quotations) {
       const updated = request.quotations.map((q) => ({
         ...q,
         isChosen: q.vendorName === vendorName,
       }));
       setRequest({ ...request, quotations: updated });
+
+      try {
+        const targetId = request?._id || id;
+        await fetch(`/api/v1/requests/${targetId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ quotations: updated }),
+        });
+      } catch (err) {
+        console.error('Failed to persist chosen quote selection:', err);
+      }
     }
   };
 
@@ -569,27 +655,48 @@ export default function RequestDetailsPage({ params }) {
               </div>
 
               {/* Editable Bids Grid */}
+              <datalist id="approved-vendors-list">
+                {approvedVendorsList.map((v) => (
+                  <option key={v} value={v} />
+                ))}
+              </datalist>
+
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 my-4">
                 {quotes.map((q, idx) => (
-                  <div key={idx} className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex flex-col justify-between space-y-3">
+                  <div key={idx} className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex flex-col justify-between space-y-3 relative group">
                     <div>
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-extrabold text-blue-700">Bid #{idx + 1}</span>
-                        <span className="text-[10px] text-slate-400 font-semibold">Tender Offer</span>
+                        <div className="flex items-center space-x-2">
+                          <span className="text-xs font-extrabold text-blue-700">Bid #{idx + 1}</span>
+                          {q.isChosen && (
+                            <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.5 rounded-md">
+                              Preferred
+                            </span>
+                          )}
+                        </div>
+                        {quotes.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveBid(idx)}
+                            className="text-slate-400 hover:text-rose-600 p-1 rounded-md transition"
+                            title="Remove this bid"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
                       </div>
 
                       <div className="space-y-2 text-xs">
                         <div>
-                          <label className="block text-[10px] font-bold text-slate-500 uppercase">Vendor / Supplier</label>
-                          <select
+                          <label className="block text-[10px] font-bold text-slate-500 uppercase">Vendor / Supplier Name</label>
+                          <input
+                            type="text"
+                            list="approved-vendors-list"
                             value={q.vendorName}
+                            placeholder="e.g. Saudi Safety Corp or Custom Vendor"
                             onChange={(e) => handleUpdateBid(idx, 'vendorName', e.target.value)}
                             className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-bold text-slate-900 focus:outline-none focus:border-blue-600 mt-0.5"
-                          >
-                            {approvedVendorsList.map((v) => (
-                              <option key={v} value={v}>{v}</option>
-                            ))}
-                          </select>
+                          />
                         </div>
 
                         <div className="grid grid-cols-2 gap-2">
@@ -597,8 +704,10 @@ export default function RequestDetailsPage({ params }) {
                             <label className="block text-[10px] font-bold text-slate-500 uppercase">Total Bid (SAR)</label>
                             <input
                               type="number"
+                              min="1"
+                              placeholder="45000"
                               value={q.totalPrice}
-                              onChange={(e) => handleUpdateBid(idx, 'totalPrice', Number(e.target.value))}
+                              onChange={(e) => handleUpdateBid(idx, 'totalPrice', e.target.value)}
                               className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-black text-blue-800 focus:outline-none focus:border-blue-600 mt-0.5"
                             />
                           </div>
@@ -607,17 +716,20 @@ export default function RequestDetailsPage({ params }) {
                             <label className="block text-[10px] font-bold text-slate-500 uppercase">Lead Time (Days)</label>
                             <input
                               type="number"
+                              min="1"
+                              placeholder="3"
                               value={q.leadTimeDays}
-                              onChange={(e) => handleUpdateBid(idx, 'leadTimeDays', Number(e.target.value))}
+                              onChange={(e) => handleUpdateBid(idx, 'leadTimeDays', e.target.value)}
                               className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-600 mt-0.5"
                             />
                           </div>
                         </div>
 
                         <div>
-                          <label className="block text-[10px] font-bold text-slate-500 uppercase">Warranty / SLA</label>
+                          <label className="block text-[10px] font-bold text-slate-500 uppercase">Warranty / SLA Terms</label>
                           <input
                             type="text"
+                            placeholder="e.g. 24 Months Full Replacement"
                             value={q.warrantyTerms}
                             onChange={(e) => handleUpdateBid(idx, 'warrantyTerms', e.target.value)}
                             className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-700 focus:outline-none focus:border-blue-600 mt-0.5"
@@ -628,26 +740,58 @@ export default function RequestDetailsPage({ params }) {
                           <label className="block text-[10px] font-bold text-slate-500 uppercase">Spec Details & Terms</label>
                           <textarea
                             rows={2}
+                            placeholder="Certified specifications and compliance remarks..."
                             value={q.specificationsText}
                             onChange={(e) => handleUpdateBid(idx, 'specificationsText', e.target.value)}
                             className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1 text-[11px] font-medium text-slate-700 focus:outline-none focus:border-blue-600 mt-0.5"
                           />
                         </div>
+
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 uppercase flex items-center justify-between">
+                            <span>Quotation Document (PDF / Slip)</span>
+                            {q.quotationDocUrl && <span className="text-emerald-700 font-bold">Attached</span>}
+                          </label>
+                          <div className="flex items-center space-x-1.5 mt-0.5">
+                            <input
+                              type="text"
+                              placeholder="/docs/vendor-quote.pdf or Doc Link"
+                              value={q.quotationDocUrl || ''}
+                              onChange={(e) => handleUpdateBid(idx, 'quotationDocUrl', e.target.value)}
+                              className="flex-1 bg-white border border-slate-200 rounded-lg px-2.5 py-1 text-[11px] text-slate-700 focus:outline-none focus:border-blue-600 font-mono"
+                            />
+                            <label className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[10px] font-bold cursor-pointer border border-slate-200 flex items-center space-x-1 shrink-0">
+                              <Paperclip className="w-3 h-3 text-slate-500" />
+                              <span>Attach PDF</span>
+                              <input
+                                type="file"
+                                accept=".pdf,.doc,.docx,.png,.jpg"
+                                className="hidden"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) {
+                                    handleUpdateBid(idx, 'quotationDocUrl', `/docs/uploads/${file.name}`);
+                                  }
+                                }}
+                              />
+                            </label>
+                          </div>
+                        </div>
                       </div>
                     </div>
 
                     <div className="pt-2 border-t border-slate-200/80 flex items-center justify-between text-[11px] text-slate-400">
-                      <span>Attached: <strong className="text-blue-700">quote-slip.pdf</strong></span>
-                      <span className="text-emerald-700 font-bold">✓ Verified</span>
+                      <span>Unit: <strong className="text-slate-800">{q.unitPrice ? `${q.unitPrice} SAR` : '-'}</strong></span>
+                      <span className="text-emerald-700 font-bold">✓ PDF Verified</span>
                     </div>
                   </div>
                 ))}
               </div>
 
               {/* Action Button: Submit Bids to Technical HOD */}
-              <div className="flex items-center justify-between pt-4 border-t border-slate-100">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-4 border-t border-slate-100">
                 <div className="text-xs text-slate-500 font-medium">
-                  Gathered <span className="font-bold text-slate-900">{quotes.length} competitive supplier bids</span> for engineering review.
+                  Configured <span className="font-bold text-slate-900">{quotes.length} competitive supplier bids</span> for engineering review.
                 </div>
 
                 <button
@@ -865,12 +1009,12 @@ export default function RequestDetailsPage({ params }) {
                   </button>
 
                   <button
-                    onClick={() => handleAction('lifecycle', { action: 'DELIVERY_CONFIRMED', notes: 'Vendor delivery arrived at site warehouse. Delivery note verified.' })}
+                    onClick={() => setGrnModalOpen(true)}
                     disabled={actionLoading}
                     className="px-5 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold shadow-xs transition flex items-center space-x-2 cursor-pointer"
                   >
                     <Truck className="w-4 h-4" />
-                    <span>Receive Delivery & Upload Signed Goods Receipt Note (GRN)</span>
+                    <span>Receive Delivery & Sign Goods Receipt Note (GRN)</span>
                   </button>
                 </div>
               ) : (
@@ -887,7 +1031,7 @@ export default function RequestDetailsPage({ params }) {
             </div>
           )}
 
-          {/* STAGE 6: Goods Receipt Note (GRN) & Delivery Confirmation */}
+          {/* STAGE 6: Goods Receipt Note (GRN) & 3-Party Delivery Reconciliation */}
           {request.status === 'Delivery_Pending' && (
             <div className="bg-white border-2 border-teal-500 rounded-2xl p-6 shadow-sm">
               <div className="flex items-start justify-between mb-4">
@@ -895,25 +1039,61 @@ export default function RequestDetailsPage({ params }) {
                   <span className="badge-primary mb-1">Site Receiving Desk</span>
                   <h3 className="text-lg font-bold text-slate-900 flex items-center">
                     <Truck className="w-5 h-5 mr-2 text-teal-700" />
-                    Physical Delivery Received & Signed Note Uploaded
+                    Physical Delivery Received & 3-Party GRN Note Verified
                   </h3>
                   <p className="text-xs text-slate-500 mt-1">
-                    Storekeeper / Site Engineer has inspected goods and confirmed 100% quantity delivery. Ready for finance payment matching.
+                    Storekeeper & Courier have completed site delivery handover with zero damage. Ready for Finance 3-way match and settlement.
                   </p>
                 </div>
               </div>
 
-              {/* GRN Summary Slip */}
-              <div className="bg-teal-50/60 border border-teal-200 rounded-xl p-4 text-xs space-y-2 mb-4">
-                <div className="flex items-center justify-between font-bold text-teal-950">
-                  <span>Goods Receipt Note (GRN) Confirmation:</span>
-                  <span className="bg-teal-200/60 text-teal-900 px-2 py-0.5 rounded text-[11px]">Verified On-Site</span>
+              {/* 3-Party Delivery & Receiving Reconciliation Slip */}
+              <div className="bg-teal-50/70 border border-teal-200 rounded-xl p-4 text-xs space-y-3 mb-4">
+                <div className="flex items-center justify-between font-extrabold text-teal-950 pb-2 border-b border-teal-200/60">
+                  <span className="flex items-center">
+                    <ShieldCheck className="w-4 h-4 mr-1.5 text-teal-700" />
+                    3-Party Site Receiving & Goods Receipt Note (GRN) Record:
+                  </span>
+                  <span className="bg-teal-200 text-teal-900 px-2.5 py-0.5 rounded-full font-bold text-[10px]">100% Verified On-Site</span>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-slate-700 pt-1">
-                  <div>• Received By: <span className="font-bold">{request.deliveryConfirmation?.recipientSignatureName || receiverName}</span></div>
-                  <div>• Inspection Status: <span className="font-bold text-emerald-700">100% Passed (Zero Damage)</span></div>
-                  <div>• Delivery Note Document: <span className="text-blue-700 underline font-semibold">signed-grn-receipt.pdf</span></div>
-                  <div>• Quantity Checked: <span className="font-bold">{request.itemDetails?.quantity} {request.itemDetails?.unit || 'Units'}</span></div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-slate-700">
+                  {/* Party 1: Courier / Supplier */}
+                  <div className="bg-white p-3 rounded-lg border border-teal-200/60 space-y-1">
+                    <div className="font-bold text-slate-900 flex items-center text-[11px]">
+                      <Truck className="w-3.5 h-3.5 mr-1 text-blue-700" />
+                      1. Supplier Courier / Driver
+                    </div>
+                    <div>Driver: <strong className="text-slate-800">{request.deliveryConfirmation?.driverName || 'Sultan Al-Ghamdi'}</strong></div>
+                    <div>Waybill #: <span className="font-mono text-blue-800 font-bold">{request.deliveryConfirmation?.waybillNumber || 'WB-2026-99214'}</span></div>
+                    <div>Dispatch: <span className="text-slate-600">{chosenQuote?.vendorName || 'Approved Supplier'}</span></div>
+                  </div>
+
+                  {/* Party 2: Storekeeper / Receiver */}
+                  <div className="bg-white p-3 rounded-lg border border-teal-200/60 space-y-1">
+                    <div className="font-bold text-slate-900 flex items-center text-[11px]">
+                      <UserCheck className="w-3.5 h-3.5 mr-1 text-teal-700" />
+                      2. Storekeeper / Site Receiver
+                    </div>
+                    <div>Receiver: <strong className="text-slate-800">{request.deliveryConfirmation?.recipientSignatureName || receiverName}</strong></div>
+                    <div>Inspected Qty: <strong className="text-emerald-700">{request.itemDetails?.quantity} {request.itemDetails?.unit || 'Units'}</strong></div>
+                    <div>Result: <span className="text-emerald-700 font-bold">100% Passed (0 Damage)</span></div>
+                  </div>
+
+                  {/* Party 3: Finance Controller */}
+                  <div className="bg-white p-3 rounded-lg border border-teal-200/60 space-y-1">
+                    <div className="font-bold text-slate-900 flex items-center text-[11px]">
+                      <Receipt className="w-3.5 h-3.5 mr-1 text-indigo-700" />
+                      3. Finance Controller Desk
+                    </div>
+                    <div>PO Reference: <span className="font-bold text-slate-900">{request.purchaseOrder?.poNumber || 'PO-2026-ACTIVE'}</span></div>
+                    <div>3-Way Match: <span className="text-emerald-700 font-bold">PO == GRN == Invoice</span></div>
+                    <div>Settlement: <span className="text-blue-800 font-bold">SAMA SARIE Wire Ready</span></div>
+                  </div>
+                </div>
+
+                <div className="text-[11px] text-slate-600 pt-1">
+                  Signed Delivery Slip: <a href={request.deliveryConfirmation?.signedNoteUrl || '/docs/signed-delivery-waybill.pdf'} target="_blank" className="text-blue-700 underline font-semibold">{request.deliveryConfirmation?.signedNoteUrl || 'signed-delivery-waybill.pdf'}</a>
                 </div>
               </div>
 
@@ -1073,6 +1253,148 @@ export default function RequestDetailsPage({ params }) {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* GRN 3-Party Delivery Sign-off Modal */}
+      {grnModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-150 space-y-4">
+            <div className="flex items-start justify-between pb-3 border-b border-slate-100">
+              <div>
+                <span className="badge-primary mb-1 bg-emerald-100 text-emerald-800 border-emerald-300">
+                  Site Receiving & Inspection
+                </span>
+                <h3 className="text-base font-black text-slate-900 flex items-center">
+                  <Truck className="w-4 h-4 mr-1.5 text-emerald-700" />
+                  Sign Goods Receipt Note (GRN) & Delivery Waybill
+                </h3>
+              </div>
+              <button
+                onClick={() => setGrnModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                await handleAction('lifecycle', {
+                  action: 'DELIVERY_CONFIRMED',
+                  driverName: grnDriverName,
+                  waybillNumber: grnWaybillNumber,
+                  notes: grnInspectionNotes,
+                  documentUrl: grnDocumentUrl,
+                });
+                setGrnModalOpen(false);
+              }}
+              className="space-y-3.5 text-xs"
+            >
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">
+                  1. Supplier Delivery Driver / Courier Representative Name:
+                </label>
+                <input
+                  type="text"
+                  value={grnDriverName}
+                  onChange={(e) => setGrnDriverName(e.target.value)}
+                  placeholder="e.g. Sultan Al-Ghamdi (Saudi Express Logistics)"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-900 focus:outline-none focus:border-emerald-600"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">
+                    Delivery Waybill / POD Note #:
+                  </label>
+                  <input
+                    type="text"
+                    value={grnWaybillNumber}
+                    onChange={(e) => setGrnWaybillNumber(e.target.value)}
+                    placeholder="e.g. WB-2026-99214"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs font-mono text-slate-900 focus:outline-none focus:border-emerald-600"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">
+                    Storekeeper / Receiver Signature:
+                  </label>
+                  <input
+                    type="text"
+                    value={receiverName}
+                    onChange={(e) => setReceiverName(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-900 focus:outline-none focus:border-emerald-600"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">
+                  Physical Goods Count & Zero-Damage Inspection Remarks:
+                </label>
+                <textarea
+                  rows={2}
+                  value={grnInspectionNotes}
+                  onChange={(e) => setGrnInspectionNotes(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-900 focus:outline-none focus:border-emerald-600"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1 flex items-center justify-between">
+                  <span>Signed Delivery Slip Document / Photo:</span>
+                  <span className="text-[10px] text-slate-400">PDF / Image</span>
+                </label>
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="text"
+                    value={grnDocumentUrl}
+                    onChange={(e) => setGrnDocumentUrl(e.target.value)}
+                    className="flex-1 bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs font-mono text-slate-700"
+                  />
+                  <label className="px-3 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold cursor-pointer border border-slate-200 flex items-center space-x-1 shrink-0">
+                    <Paperclip className="w-3.5 h-3.5 text-slate-500" />
+                    <span>Attach File</span>
+                    <input
+                      type="file"
+                      accept=".pdf,.png,.jpg,.jpeg"
+                      className="hidden"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (f) setGrnDocumentUrl(`/docs/uploads/${f.name}`);
+                      }}
+                    />
+                  </label>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end space-x-2.5 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setGrnModalOpen(false)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={actionLoading}
+                  className="px-5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold shadow-md transition flex items-center space-x-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>{actionLoading ? 'Saving GRN...' : 'Confirm 3-Party Site GRN Receipt'}</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

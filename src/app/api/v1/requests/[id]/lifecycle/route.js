@@ -4,6 +4,7 @@ import { auth } from '@/lib/auth';
 import dbConnect from '@/lib/mongodb';
 import ProcurementRequest from '@/models/ProcurementRequest';
 import { mockDb } from '@/lib/mockDb';
+import { sanitizeQuotations } from '@/lib/sanitizeQuotations';
 
 export async function POST(req, context) {
   try {
@@ -22,7 +23,7 @@ export async function POST(req, context) {
     const id = decodeURIComponent(rawId || '');
 
     const body = await req.json();
-    const { action, notes, quotations, documentUrl, reasonCategory, targetStage, currentStage } = body;
+    const { action, notes, quotations, documentUrl, reasonCategory, targetStage, currentStage, driverName, waybillNumber } = body;
 
     // Role checks based on action
     const userRole = session.user.role;
@@ -137,7 +138,8 @@ export async function POST(req, context) {
 
     // 1. Try Live MongoDB
     try {
-      await dbConnect();
+      const conn = await dbConnect();
+      if (!conn) throw new Error('MongoDB is offline');
       const orConditions = [
         { ticketId: id },
         { ticketId: id.toUpperCase() }
@@ -159,7 +161,8 @@ export async function POST(req, context) {
         request.timeline.push(timelineEntry);
 
         if (action === 'QUOTES_SUBMITTED' && quotations && quotations.length > 0) {
-          request.quotations = quotations;
+          const qty = request.itemDetails?.quantity || 1;
+          request.quotations = sanitizeQuotations(quotations, qty);
           if (request.flaggedIssue) request.flaggedIssue.isFlagged = false;
         } else if (action === 'FLAG_ISSUE' || action === 'REVERT_STAGE') {
           request.flaggedIssue = {
@@ -175,6 +178,8 @@ export async function POST(req, context) {
           if (request.flaggedIssue) request.flaggedIssue.isFlagged = false;
         } else if (action === 'DELIVERY_CONFIRMED') {
           request.deliveryConfirmation = {
+            driverName: driverName || 'Supplier Courier Representative',
+            waybillNumber: waybillNumber || `WB-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`,
             receivedAt: new Date(),
             recipientSignatureName: actorName,
             signedNoteUrl: documentUrl || '/docs/signed-grn-receipt.pdf',
@@ -184,6 +189,10 @@ export async function POST(req, context) {
         }
 
         await request.save();
+        const mIdx = mockDb.requests.findIndex(r => r._id === id || r.ticketId === id || r.ticketId === id.toUpperCase());
+        if (mIdx !== -1) {
+          mockDb.requests[mIdx] = request.toObject ? request.toObject() : request;
+        }
         return NextResponse.json({ success: true, data: request }, { status: 200 });
       }
     } catch (dbErr) {
@@ -201,7 +210,8 @@ export async function POST(req, context) {
 
       mockDb.requests[index].status = newStatus;
       if (action === 'QUOTES_SUBMITTED' && quotations) {
-        mockDb.requests[index].quotations = quotations;
+        const qty = mockReq.itemDetails?.quantity || 1;
+        mockDb.requests[index].quotations = sanitizeQuotations(quotations, qty);
         if (mockDb.requests[index].flaggedIssue) mockDb.requests[index].flaggedIssue.isFlagged = false;
       }
       if (action === 'FLAG_ISSUE') {
@@ -216,6 +226,8 @@ export async function POST(req, context) {
       }
       if (action === 'DELIVERY_CONFIRMED') {
         mockDb.requests[index].deliveryConfirmation = {
+          driverName: driverName || 'Supplier Courier Representative',
+          waybillNumber: waybillNumber || `WB-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`,
           receivedAt: new Date(),
           recipientSignatureName: actorName,
           signedNoteUrl: documentUrl || '/docs/signed-grn-receipt.pdf',

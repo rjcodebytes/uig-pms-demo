@@ -12,7 +12,8 @@ export async function GET(req) {
     const regionFlag = url.searchParams.get('region') || 'Riyadh';
 
     try {
-      await dbConnect();
+      const conn = await dbConnect();
+      if (!conn) throw new Error('MongoDB is offline');
       let query = {};
       if (role === 'Regional_Procurement') {
         query.location = regionFlag;
@@ -95,8 +96,12 @@ export async function POST(req) {
     };
 
     try {
-      await dbConnect();
+      const conn = await dbConnect();
+      if (!conn) throw new Error('MongoDB is offline');
       const dbReq = await ProcurementRequest.create(newRequest);
+      const jsonReq = dbReq.toObject ? dbReq.toObject() : dbReq;
+      jsonReq._id = String(jsonReq._id);
+      mockDb.requests.unshift(jsonReq);
       return NextResponse.json({ success: true, data: dbReq }, { status: 201 });
     } catch (dbErr) {
       console.warn("MongoDB unavailable, saving to persistent mockDb:", dbErr);

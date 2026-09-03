@@ -71,10 +71,10 @@ export default function Navbar({ user }) {
 
   const testRoles = [
     { username: 'admin', label: 'System Admin (Master View)', role: 'Admin', desc: 'All KSA location pipelines & full admin controls', icon: '⚡' },
-    { username: 'initiator', label: 'Site Engineer (Eng. Mohammed)', role: 'Initiator', desc: 'Creates requisitions & receives site goods', icon: '👷' },
+    { username: 'initiator', label: 'Site Engineer (Eng. Mohammed)', role: 'Initiator', desc: 'Creates requisitions & tracks site goods', icon: '👷' },
     { username: 'approver', label: 'Technical Approver / HOD', role: 'Approver', desc: 'Reviews 3-bid tenders & engineering specs', icon: '📑' },
-    { username: 'storeincharge', label: 'Finance Controller (Mansoor)', role: 'Finance', desc: 'Price baseline variance, budget & 3-way payment', icon: '💼' },
-    { username: 'storekeeper', label: 'Storekeeper / Site Receiver', role: 'Store Keeper', desc: 'Inspects delivery & signs GRN receipt note', icon: '📦' },
+    { username: 'storeincharge', label: 'Finance Controller & Commercial Lead', role: 'Finance', desc: 'Price baseline variance, budget & 3-way payment', icon: '💼' },
+    { username: 'storekeeper', label: 'Warehouse Receiver & Storekeeper', role: 'Store Keeper', desc: 'Inspects site delivery & signs GRN receipt note', icon: '📦' },
   ];
 
   const handleSwitchRole = async (username) => {
@@ -101,8 +101,8 @@ export default function Navbar({ user }) {
           <span className="text-slate-400 hidden sm:inline-block">
             {userRole === 'Initiator' ? 'Site Requisitions & Material Ingestion Portal' :
              userRole === 'Approver' ? 'Technical Specification Review Desk' :
-             userRole === 'Store Incharge' ? 'Commercial & Finance Compliance Center' :
-             userRole === 'Store Keeper' ? 'Warehouse & Site Receiving (GRN) Desk' :
+             userRole === 'Store Incharge' ? 'Finance Controller & Commercial Compliance Center' :
+             userRole === 'Store Keeper' ? 'Warehouse & Site Goods Receiving (GRN) Desk' :
              'Executive Management Oversight (All KSA Desks)'}
           </span>
         </div>
@@ -115,7 +115,9 @@ export default function Navbar({ user }) {
           >
             <Sparkles className="w-3 h-3 text-amber-400" />
             <span>Switch Role Test View: </span>
-            <span className="text-white font-black underline ml-0.5">{userRole}</span>
+            <span className="text-white font-black underline ml-0.5">
+              {userRole === 'Store Incharge' ? 'Finance Controller' : userRole}
+            </span>
             <ChevronDown className="w-3 h-3 text-blue-300 ml-1" />
           </button>
 
@@ -165,7 +167,7 @@ export default function Navbar({ user }) {
                   <span className="font-bold text-blue-700 text-lg tracking-tight">PMS</span>
                 </div>
                 <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider -mt-1">
-                  {userRole} Workspace
+                  {userRole === 'Store Incharge' ? 'Finance & Commercial Control' : userRole === 'Store Keeper' ? 'Warehouse & Site Receiving' : `${userRole} Workspace`}
                 </div>
               </div>
             </Link>

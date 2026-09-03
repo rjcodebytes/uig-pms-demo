@@ -66,9 +66,12 @@ export default function VendorsPage() {
       if (data.success) {
         setIsModalOpen(false);
         fetchVendors();
+      } else {
+        alert(data.message || 'Failed to onboard vendor. Please check CR and VAT numbers.');
       }
     } catch (err) {
       console.error(err);
+      alert('Network or server error creating vendor.');
     }
     setSubmitting(false);
   };
