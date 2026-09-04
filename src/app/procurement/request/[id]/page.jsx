@@ -224,6 +224,42 @@ export default function RequestDetailsPage({ params }) {
     }
   };
 
+  // Dynamic Revert Destinations
+  const getRevertDestinationOptions = (status) => {
+    switch (status) {
+      case 'Technical_Approval':
+        return [
+          { value: 'Quotation_Collection', label: 'Stage 2: Quotation Tender Sourcing (Procurement Desk)' },
+          { value: 'Incoming', label: 'Stage 1: Requisition Definition (Site Initiator)' },
+          { value: 'Technical_Approval', label: 'Stage 3: Technical Review Desk (Flag Issue Only)' },
+        ];
+      case 'Finance_Review':
+        return [
+          { value: 'Quotation_Collection', label: 'Stage 2: Quotation Tender Sourcing (Procurement Desk)' },
+          { value: 'Technical_Approval', label: 'Stage 3: Technical Approval (Technical HOD)' },
+          { value: 'Incoming', label: 'Stage 1: Requisition Definition (Site Initiator)' },
+          { value: 'Finance_Review', label: 'Stage 4: Finance Review Desk (Flag Issue Only)' },
+        ];
+      case 'PO_Generated':
+        return [
+          { value: 'PO_Generated', label: 'Stage 5: Official PO Active (Flag Supplier / Delivery Delay SLA)' },
+          { value: 'Finance_Review', label: 'Stage 4: Return to Finance Controller' },
+          { value: 'Quotation_Collection', label: 'Stage 2: Return to Sourcing & Retender' },
+        ];
+      case 'Delivery_Pending':
+        return [
+          { value: 'Delivery_Pending', label: 'Stage 6: Site Receiving Desk (Flag 3-Way Match Discrepancy / Transit Damage)' },
+          { value: 'PO_Generated', label: 'Stage 5: Return to PO Dispatched' },
+          { value: 'Quotation_Collection', label: 'Stage 2: Return to Sourcing & Retender' },
+        ];
+      default:
+        return [
+          { value: 'Quotation_Collection', label: 'Stage 2: Quotation Tender Sourcing (Procurement Desk)' },
+          { value: 'Incoming', label: 'Stage 1: Requisition Definition (Site Initiator)' },
+        ];
+    }
+  };
+
   // Open Flag Issue Modal
   const openFlagModal = (targetStage, defaultCategory) => {
     setFlagTargetStage(targetStage);
@@ -264,6 +300,40 @@ export default function RequestDetailsPage({ params }) {
       setTimeout(() => setStatusMessage(''), 5000);
     } catch (err) {
       console.error(err);
+      alert('Error flagging issue');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Resolve Flagged Issue Directly
+  const handleResolveFlag = async () => {
+    setActionLoading(true);
+    try {
+      const targetId = request?._id || id;
+      const res = await fetch(`/api/v1/requests/${targetId}/lifecycle`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'RESOLVE_FLAG',
+          targetStage: request.status,
+          currentStage: request.status,
+          notes: 'Issue addressed and resolved by user review.',
+          flaggedBy: session?.user?.name || `${userRole} Officer`,
+          flaggedRole: userRole,
+        }),
+      });
+      const data = await res.json();
+      if (data.success && data.data) {
+        setRequest(data.data);
+        setStatusMessage('✓ Issue flag marked as resolved!');
+        setTimeout(() => setStatusMessage(''), 4000);
+      } else {
+        alert(data.message || 'Failed to resolve flag');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error resolving flag');
     } finally {
       setActionLoading(false);
     }
@@ -466,30 +536,44 @@ export default function RequestDetailsPage({ params }) {
 
       {/* Prominent Flagged Issue Banner (If Issue Was Flagged) */}
       {request.flaggedIssue?.isFlagged && (
-        <div className="bg-rose-50 border-2 border-rose-500 rounded-2xl p-5 shadow-sm space-y-2 animate-in fade-in">
-          <div className="flex items-start justify-between gap-4">
+        <div className="bg-rose-50 border-2 border-rose-500 rounded-2xl p-5 shadow-sm space-y-3 animate-in fade-in">
+          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
             <div className="flex items-start space-x-3">
-              <div className="w-9 h-9 rounded-xl bg-rose-200 text-rose-800 flex items-center justify-center shrink-0">
+              <div className="w-10 h-10 rounded-xl bg-rose-200 text-rose-800 flex items-center justify-center shrink-0 shadow-xs">
                 <AlertOctagon className="w-5 h-5" />
               </div>
-              <div>
-                <div className="flex items-center space-x-2">
+              <div className="space-y-1">
+                <div className="flex flex-wrap items-center gap-2">
                   <span className="badge-danger font-extrabold text-[10px]">⚠️ ACTION REQUIRED: ISSUE FLAGGED</span>
-                  <span className="text-xs text-rose-700 font-semibold">
-                    Flagged by: <strong>{request.flaggedIssue.flaggedBy}</strong> ({request.flaggedIssue.flaggedRole})
+                  <span className="text-xs text-rose-800 font-semibold">
+                    Flagged by: <strong>{request.flaggedIssue.flaggedBy}</strong> ({request.flaggedIssue.flaggedRole || 'Reviewer'})
                   </span>
                 </div>
-                <h3 className="font-black text-rose-950 text-base mt-1">
+                <h3 className="font-black text-rose-950 text-base">
                   Reason: {request.flaggedIssue.reasonCategory}
                 </h3>
-                <p className="text-xs text-rose-900/90 mt-1 bg-white/70 p-2.5 rounded-xl border border-rose-200 font-medium leading-relaxed">
+                <p className="text-xs text-rose-900 bg-white/80 p-3 rounded-xl border border-rose-200 font-medium leading-relaxed">
                   "{request.flaggedIssue.comments}"
                 </p>
               </div>
             </div>
 
-            <div className="shrink-0 flex items-center space-x-2">
-              <span className="text-[11px] font-bold text-rose-700">Reverted to Sourcing</span>
+            <div className="shrink-0 flex flex-col sm:items-end gap-2">
+              <span className="text-xs font-bold bg-rose-200/80 text-rose-900 px-3 py-1 rounded-lg border border-rose-300 self-start sm:self-auto">
+                {request.flaggedIssue?.revertedFromStage
+                  ? `Reverted from ${request.flaggedIssue.revertedFromStage.replace(/_/g, ' ')} → ${request.status.replace(/_/g, ' ')}`
+                  : `Flagged at ${request.status.replace(/_/g, ' ')}`}
+              </span>
+
+              <button
+                onClick={handleResolveFlag}
+                disabled={actionLoading}
+                className="px-3.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold shadow-xs transition flex items-center space-x-1.5 cursor-pointer disabled:opacity-50 self-start sm:self-auto"
+                title="Mark this issue as addressed and clear flag"
+              >
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>{actionLoading ? 'Updating...' : '✓ Mark Flag as Resolved'}</span>
+              </button>
             </div>
           </div>
         </div>
@@ -1217,8 +1301,11 @@ export default function RequestDetailsPage({ params }) {
                   onChange={(e) => setFlagTargetStage(e.target.value)}
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs font-semibold text-slate-800 focus:outline-none focus:border-rose-600 focus:bg-white"
                 >
-                  <option value="Quotation_Collection">Revert to Stage 2: 3-Bid Quotes Collection (Procurement Desk)</option>
-                  <option value="Incoming">Revert to Stage 1: Requisition Definition (Site Initiator)</option>
+                  {getRevertDestinationOptions(request.status).map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
                 </select>
               </div>
 

@@ -27,27 +27,54 @@ export async function POST(req, context) {
 
     // Role checks based on action
     const userRole = session.user.role;
+    const allAuthorizedRoles = [
+      'Initiator',
+      'Approver',
+      'Technical Approver',
+      'Store Incharge',
+      'Finance Controller',
+      'Finance',
+      'Store Keeper',
+      'Storekeeper',
+      'Admin',
+      'Management',
+    ];
+
     if (action === 'DELIVERY_CONFIRMED') {
-      const allowed = ['Store Keeper', 'Storekeeper', 'Initiator', 'Admin'];
+      const allowed = ['Store Keeper', 'Storekeeper', 'Initiator', 'Admin', 'Management'];
       if (!allowed.includes(userRole)) {
         return NextResponse.json({ success: false, message: 'Forbidden: Only Storekeeper or Site Initiator can confirm delivery' }, { status: 403 });
       }
     } else if (action === 'PAYMENT_PROCESSED') {
-      const allowed = ['Store Incharge', 'Finance Controller', 'Finance', 'Admin'];
+      const allowed = ['Store Incharge', 'Finance Controller', 'Finance', 'Admin', 'Management'];
       if (!allowed.includes(userRole)) {
         return NextResponse.json({ success: false, message: 'Forbidden: Only Finance Controller can process payment' }, { status: 403 });
       }
     } else if (action === 'QUOTES_SUBMITTED') {
-      const allowed = ['Initiator', 'Procurement', 'Admin', 'Approver', 'Store Incharge'];
+      const allowed = ['Initiator', 'Procurement', 'Admin', 'Approver', 'Technical Approver', 'Store Incharge', 'Finance Controller', 'Management'];
       if (!allowed.includes(userRole)) {
         return NextResponse.json({ success: false, message: 'Forbidden: Insufficient privileges to submit quotations' }, { status: 403 });
       }
     } else if (action === 'FLAG_ISSUE' || action === 'REVERT_STAGE') {
-      const allowed = ['Approver', 'Technical Approver', 'Store Incharge', 'Finance Controller', 'Finance', 'Admin'];
-      if (!allowed.includes(userRole)) {
+      if (!allAuthorizedRoles.includes(userRole)) {
         return NextResponse.json({ success: false, message: 'Forbidden: Insufficient privileges to flag issues' }, { status: 403 });
       }
+    } else if (action === 'RESOLVE_FLAG') {
+      if (!allAuthorizedRoles.includes(userRole)) {
+        return NextResponse.json({ success: false, message: 'Forbidden: Insufficient privileges to resolve flag' }, { status: 403 });
+      }
     }
+
+    const validStages = [
+      'Incoming',
+      'Quotation_Collection',
+      'Technical_Approval',
+      'Finance_Review',
+      'PO_Generated',
+      'Delivery_Pending',
+      'Completed',
+      'Rejected_Job',
+    ];
 
     let newStatus;
     if (action === 'QUOTES_SUBMITTED') {
@@ -57,9 +84,9 @@ export async function POST(req, context) {
     } else if (action === 'PAYMENT_PROCESSED') {
       newStatus = 'Completed';
     } else if (action === 'FLAG_ISSUE' || action === 'REVERT_STAGE') {
-      newStatus = targetStage || 'Quotation_Collection';
+      newStatus = targetStage && validStages.includes(targetStage) ? targetStage : (currentStage || 'Quotation_Collection');
     } else if (action === 'RESOLVE_FLAG') {
-      newStatus = targetStage || 'Technical_Approval';
+      newStatus = targetStage && validStages.includes(targetStage) ? targetStage : (currentStage || 'Technical_Approval');
     } else {
       return NextResponse.json({ success: false, message: `Invalid action: ${action}` }, { status: 400 });
     }
@@ -68,22 +95,24 @@ export async function POST(req, context) {
     const actorRole = session.user.role || 'User';
 
     const timelineEntry = {
-      stage: action === 'FLAG_ISSUE' ? 'Issue_Flagged' : newStatus,
+      stage: action === 'FLAG_ISSUE' ? 'Issue_Flagged' : (action === 'RESOLVE_FLAG' ? 'Flag_Resolved' : newStatus),
       status: newStatus,
       date: new Date().toISOString(),
       timestamp: new Date().toISOString(),
       notes: action === 'FLAG_ISSUE'
-        ? `⚠️ Issue Flagged (${reasonCategory || 'Revision Required'}): ${notes || 'Reverted back for corrections'}`
-        : (notes || `Transitioned to ${newStatus.replace(/_/g, ' ')}`),
+        ? `⚠️ Issue Flagged (${reasonCategory || 'Revision Required'}): ${notes || 'Reverted for corrections'}`
+        : (action === 'RESOLVE_FLAG'
+          ? `✓ Flag Resolved: ${notes || 'Issue addressed and cleared'}`
+          : (notes || `Transitioned to ${newStatus.replace(/_/g, ' ')}`)),
       actor: actorName,
       role: actorRole,
       documentUrl
     };
 
-    // Helper to validate state transitions (Issue 4) and 3-Way Match (Issue 5)
+    // Helper to validate state transitions and 3-Way Match
     const validateAndApplyTransition = (reqDoc) => {
       if (action === 'QUOTES_SUBMITTED') {
-        const allowed = ['Incoming', 'Quotation_Collection'];
+        const allowed = ['Incoming', 'Quotation_Collection', 'Technical_Approval'];
         if (!allowed.includes(reqDoc.status)) {
           return { error: `Invalid state transition: Cannot submit quotes from '${reqDoc.status}'` };
         }
@@ -100,7 +129,7 @@ export async function POST(req, context) {
           return { error: `Invalid state transition: Payment requires Delivery_Pending with confirmed GRN, current status is '${reqDoc.status}'` };
         }
 
-        // Real 3-Way Match Validation (Issue 5)
+        // Real 3-Way Match Validation
         const winningQuote = reqDoc.quotations?.find(q => q.isChosen) || reqDoc.quotations?.[0];
         const poAmount = winningQuote?.totalPrice || 0;
         const invoiceAmount = body.invoiceAmount !== undefined
@@ -163,7 +192,11 @@ export async function POST(req, context) {
         if (action === 'QUOTES_SUBMITTED' && quotations && quotations.length > 0) {
           const qty = request.itemDetails?.quantity || 1;
           request.quotations = sanitizeQuotations(quotations, qty);
-          if (request.flaggedIssue) request.flaggedIssue.isFlagged = false;
+          if (request.flaggedIssue) {
+            request.flaggedIssue.isFlagged = false;
+          } else {
+            request.flaggedIssue = { isFlagged: false };
+          }
         } else if (action === 'FLAG_ISSUE' || action === 'REVERT_STAGE') {
           request.flaggedIssue = {
             isFlagged: true,
@@ -172,10 +205,19 @@ export async function POST(req, context) {
             flaggedBy: actorName,
             flaggedRole: actorRole,
             flaggedAt: new Date(),
-            revertedFromStage: currentStage || 'Technical_Approval',
+            revertedFromStage: currentStage || request.status,
           };
+          // Reset approvals if reverted back to sourcing or incoming
+          if (newStatus === 'Quotation_Collection' || newStatus === 'Incoming') {
+            if (request.technicalApproval) request.technicalApproval.isApproved = false;
+            if (request.financeReview) request.financeReview.isApproved = false;
+          }
         } else if (action === 'RESOLVE_FLAG') {
-          if (request.flaggedIssue) request.flaggedIssue.isFlagged = false;
+          if (request.flaggedIssue) {
+            request.flaggedIssue.isFlagged = false;
+          } else {
+            request.flaggedIssue = { isFlagged: false };
+          }
         } else if (action === 'DELIVERY_CONFIRMED') {
           request.deliveryConfirmation = {
             driverName: driverName || 'Supplier Courier Representative',
@@ -186,6 +228,9 @@ export async function POST(req, context) {
             inspectionNotes: notes || 'All physical goods inspected with zero defect or transit damage.',
             fullDeliveryReceived: true,
           };
+          if (request.flaggedIssue) request.flaggedIssue.isFlagged = false;
+        } else if (action === 'PAYMENT_PROCESSED') {
+          if (request.flaggedIssue) request.flaggedIssue.isFlagged = false;
         }
 
         await request.save();
@@ -209,22 +254,34 @@ export async function POST(req, context) {
       }
 
       mockDb.requests[index].status = newStatus;
+      if (!mockDb.requests[index].timeline) mockDb.requests[index].timeline = [];
+      mockDb.requests[index].timeline.push(timelineEntry);
+
       if (action === 'QUOTES_SUBMITTED' && quotations) {
         const qty = mockReq.itemDetails?.quantity || 1;
         mockDb.requests[index].quotations = sanitizeQuotations(quotations, qty);
         if (mockDb.requests[index].flaggedIssue) mockDb.requests[index].flaggedIssue.isFlagged = false;
-      }
-      if (action === 'FLAG_ISSUE') {
+      } else if (action === 'FLAG_ISSUE' || action === 'REVERT_STAGE') {
         mockDb.requests[index].flaggedIssue = {
           isFlagged: true,
           reasonCategory: reasonCategory || 'Issue Flagged',
-          comments: notes,
+          comments: notes || 'Revision requested.',
           flaggedBy: actorName,
           flaggedRole: actorRole,
           flaggedAt: new Date(),
+          revertedFromStage: currentStage || mockReq.status,
         };
-      }
-      if (action === 'DELIVERY_CONFIRMED') {
+        if (newStatus === 'Quotation_Collection' || newStatus === 'Incoming') {
+          if (mockDb.requests[index].technicalApproval) mockDb.requests[index].technicalApproval.isApproved = false;
+          if (mockDb.requests[index].financeReview) mockDb.requests[index].financeReview.isApproved = false;
+        }
+      } else if (action === 'RESOLVE_FLAG') {
+        if (mockDb.requests[index].flaggedIssue) {
+          mockDb.requests[index].flaggedIssue.isFlagged = false;
+        } else {
+          mockDb.requests[index].flaggedIssue = { isFlagged: false };
+        }
+      } else if (action === 'DELIVERY_CONFIRMED') {
         mockDb.requests[index].deliveryConfirmation = {
           driverName: driverName || 'Supplier Courier Representative',
           waybillNumber: waybillNumber || `WB-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`,
@@ -233,8 +290,11 @@ export async function POST(req, context) {
           signedNoteUrl: documentUrl || '/docs/signed-grn-receipt.pdf',
           fullDeliveryReceived: true,
         };
+        if (mockDb.requests[index].flaggedIssue) mockDb.requests[index].flaggedIssue.isFlagged = false;
+      } else if (action === 'PAYMENT_PROCESSED') {
+        if (mockDb.requests[index].flaggedIssue) mockDb.requests[index].flaggedIssue.isFlagged = false;
       }
-      mockDb.requests[index].timeline.push(timelineEntry);
+
       return NextResponse.json({ success: true, data: mockDb.requests[index] }, { status: 200 });
     }
 

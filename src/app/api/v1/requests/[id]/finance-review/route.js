@@ -105,6 +105,13 @@ export async function POST(req, context) {
           };
           
           request.status = newStatus;
+          if (isApproved) {
+            if (request.flaggedIssue) {
+              request.flaggedIssue.isFlagged = false;
+            } else {
+              request.flaggedIssue = { isFlagged: false };
+            }
+          }
           if (!request.timeline) request.timeline = [];
           request.timeline.push(timelineEntry);
           
@@ -171,6 +178,13 @@ export async function POST(req, context) {
     }
 
     mockDb.requests[index].status = newStatus;
+    if (isApproved) {
+      if (mockDb.requests[index].flaggedIssue) {
+        mockDb.requests[index].flaggedIssue.isFlagged = false;
+      } else {
+        mockDb.requests[index].flaggedIssue = { isFlagged: false };
+      }
+    }
     mockDb.requests[index].timeline.push(timelineEntry);
     return NextResponse.json({ success: true, data: mockDb.requests[index] }, { status: 200 });
   } catch (error) {
